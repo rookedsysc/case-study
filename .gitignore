@@ -35,6 +35,10 @@ out/
 
 ### VS Code ###
 .vscode/
+.claude/plan
 
 ### Kotlin ###
 .kotlin
+
+### Docker ###
+.env

@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: case-study
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/casestudy
+    username: appuser
+    password: apppassword
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: redispassword
+
+server:
+  port: 8080

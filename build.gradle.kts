@@ -12,8 +12,12 @@ description = "case-study"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(24)
+        languageVersion = JavaLanguageVersion.of(25)
     }
+}
+
+tasks.withType<JavaCompile> {
+    options.release.set(24)
 }
 
 repositories {
@@ -37,6 +41,7 @@ dependencies {
 kotlin {
     compilerOptions {
         freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_24)
     }
 }
 

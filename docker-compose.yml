@@ -19,7 +19,7 @@ services:
           memory: 1G
 
   app-1:
-    build: .
+    build: ./kotlin-server
     expose:
       - "${APP_PORT:-8080}"
     environment:
@@ -42,7 +42,7 @@ services:
           memory: 1G
 
   app-2:
-    build: .
+    build: ./kotlin-server
     expose:
       - "${APP_PORT:-8080}"
     environment:
@@ -65,7 +65,7 @@ services:
           memory: 1G
 
   app-3:
-    build: .
+    build: ./kotlin-server
     expose:
       - "${APP_PORT:-8080}"
     environment:

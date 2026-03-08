@@ -149,6 +149,7 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+      - loki
     deploy:
       resources:
         limits:
@@ -174,6 +175,20 @@ services:
           cpus: 1
           memory: 1G
 
+  loki:
+    image: grafana/loki:3.4.1
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 512M
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.116.1
     ports:
@@ -183,6 +198,8 @@ services:
     command: ["--config=/etc/otel/otel-collector-config.yaml"]
     volumes:
       - ./otel/otel-collector-config.yaml:/etc/otel/otel-collector-config.yaml:ro
+    depends_on:
+      - loki
     deploy:
       resources:
         limits:
@@ -242,3 +259,4 @@ volumes:
   redis-data:
   grafana-data:
   prometheus-data:
+  loki-data:

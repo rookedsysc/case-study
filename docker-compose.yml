@@ -19,17 +19,18 @@ services:
           memory: 1G
 
   app-1:
-    build: .
+    build: ./kotlin-server
     expose:
       - "${APP_PORT:-8080}"
     environment:
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-docker}
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:${MYSQL_PORT:-3306}/${MYSQL_DATABASE:-casestudy}
-      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER:-appuser}
-      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-apppassword}
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=${REDIS_PORT:-6379}
-      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
+      - MYSQL_USER=${MYSQL_USER:-appuser}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
     depends_on:
       mysql:
         condition: service_healthy
@@ -42,17 +43,18 @@ services:
           memory: 1G
 
   app-2:
-    build: .
+    build: ./kotlin-server
     expose:
       - "${APP_PORT:-8080}"
     environment:
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-docker}
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:${MYSQL_PORT:-3306}/${MYSQL_DATABASE:-casestudy}
-      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER:-appuser}
-      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-apppassword}
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=${REDIS_PORT:-6379}
-      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
+      - MYSQL_USER=${MYSQL_USER:-appuser}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
     depends_on:
       mysql:
         condition: service_healthy
@@ -65,17 +67,18 @@ services:
           memory: 1G
 
   app-3:
-    build: .
+    build: ./kotlin-server
     expose:
       - "${APP_PORT:-8080}"
     environment:
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-docker}
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:${MYSQL_PORT:-3306}/${MYSQL_DATABASE:-casestudy}
-      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER:-appuser}
-      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-apppassword}
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=${REDIS_PORT:-6379}
-      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
+      - MYSQL_USER=${MYSQL_USER:-appuser}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
     depends_on:
       mysql:
         condition: service_healthy

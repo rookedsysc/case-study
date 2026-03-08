@@ -6,6 +6,7 @@ object StoreMapper {
     fun toResponse(entity: StoreEntity): StoreResponse = StoreResponse(
         id = entity.id,
         name = entity.name,
+        eventTotalCount = entity.eventTotalCount,
         createdAt = entity.createdAt,
     )
 }

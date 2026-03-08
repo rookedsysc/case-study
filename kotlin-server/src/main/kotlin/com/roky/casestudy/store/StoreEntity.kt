@@ -16,6 +16,13 @@ class StoreEntity(
     @Column(nullable = false)
     val name: String,
 
+    @Column(nullable = false)
+    val eventTotalCount: Long = DEFAULT_EVENT_TOTAL_COUNT,
+
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
-)
+) {
+    companion object {
+        const val DEFAULT_EVENT_TOTAL_COUNT = 300_000L
+    }
+}

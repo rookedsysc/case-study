@@ -11,7 +11,10 @@ class StoreService(private val storeRepository: StoreRepository) {
 
     /** 새 상점을 생성합니다. */
     fun createStore(request: CreateStoreRequest): StoreResponse {
-        val store = StoreEntity(name = request.name)
+        val store = StoreEntity(
+            name = request.name,
+            eventTotalCount = request.eventTotalCount,
+        )
         return StoreMapper.toResponse(storeRepository.save(store))
     }
 
@@ -34,7 +37,12 @@ class StoreService(private val storeRepository: StoreRepository) {
      * @returns 생성된 상점 ID 목록
      */
     fun createStoresBulk(count: Int): BulkCreateStoresResponse {
-        val stores = (1..count).map { StoreEntity(name = "bulk_store_${UUID.randomUUID()}") }
+        val stores = (1..count).map {
+            StoreEntity(
+                name = "bulk_store_${UUID.randomUUID()}",
+                eventTotalCount = StoreEntity.DEFAULT_EVENT_TOTAL_COUNT,
+            )
+        }
         val savedStores = storeRepository.saveAll(stores)
         return BulkCreateStoresResponse(ids = savedStores.map { it.id })
     }

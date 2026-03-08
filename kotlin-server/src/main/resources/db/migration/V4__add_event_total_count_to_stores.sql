@@ -1,0 +1,2 @@
+ALTER TABLE stores
+    ADD COLUMN event_total_count BIGINT NOT NULL DEFAULT 300000;

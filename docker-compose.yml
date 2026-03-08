@@ -31,10 +31,13 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+      - OTEL_COLLECTOR_HOST=otel-collector
     depends_on:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_started
+      otel-collector:
         condition: service_started
     deploy:
       resources:
@@ -55,10 +58,13 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+      - OTEL_COLLECTOR_HOST=otel-collector
     depends_on:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_started
+      otel-collector:
         condition: service_started
     deploy:
       resources:
@@ -79,10 +85,13 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+      - OTEL_COLLECTOR_HOST=otel-collector
     depends_on:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_started
+      otel-collector:
         condition: service_started
     deploy:
       resources:
@@ -125,6 +134,111 @@ services:
           cpus: 1
           memory: 1G
 
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_RENDERING_SERVER_URL=http://renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 512M
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1G
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    command: ["--config=/etc/otel/otel-collector-config.yaml"]
+    volumes:
+      - ./otel/otel-collector-config.yaml:/etc/otel/otel-collector-config.yaml:ro
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 512M
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 256M
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.16.0
+    environment:
+      - DATA_SOURCE_NAME=root:${MYSQL_ROOT_PASSWORD:-rootpassword}@(mysql:3306)/
+    ports:
+      - "9104:9104"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 256M
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 256M
+
 volumes:
   mysql-data:
   redis-data:
+  grafana-data:
+  prometheus-data:

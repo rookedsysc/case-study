@@ -8,9 +8,10 @@ const CONFIG = {
   baseUrl: __ENV.BASE_URL || "http://localhost:80",
   headers: { "Content-Type": "application/json" },
   storeCount: 1,
+  storeEventTotalCount: 1000,
   userCount: 10000,
   bulkCreateLimit: 1000,
-  vus: 10000,
+  vus: 100000,
   duration: "5m",
   tags: {
     createStores: { phase: "setup", kind: "create_stores_bulk" },
@@ -58,7 +59,9 @@ function readIds(response, expectedCount, resourceName) {
     !Array.isArray(body.ids) ||
     body.ids.length !== expectedCount
   ) {
-    throw new Error(`${resourceName} bulk 생성에 실패했습니다 (count=${expectedCount})`);
+    throw new Error(
+      `${resourceName} bulk 생성에 실패했습니다 (count=${expectedCount})`,
+    );
   }
 
   return body.ids;
@@ -67,7 +70,10 @@ function readIds(response, expectedCount, resourceName) {
 function createStoreId() {
   const response = postJson(
     "/api/stores/bulk",
-    { count: CONFIG.storeCount },
+    {
+      count: CONFIG.storeCount,
+      eventTotalCount: CONFIG.storeEventTotalCount,
+    },
     CONFIG.tags.createStores,
   );
 

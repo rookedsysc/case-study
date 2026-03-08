@@ -7,5 +7,6 @@ import java.util.UUID
 data class StoreResponse(
     val id: UUID,
     val name: String,
+    val eventTotalCount: Long,
     val createdAt: Instant,
 )

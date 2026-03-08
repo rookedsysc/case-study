@@ -15,12 +15,8 @@ class CouponService(
     private val storeRepository: StoreRepository,
     private val appUserRepository: AppUserRepository,
 ) {
-    companion object {
-        private const val MAX_COUPONS_PER_STORE = 300_000L
-    }
-
     /**
-     * 쿠폰을 발행합니다. 상점당 최대 30만개의 쿠폰이 제공되며, 유저는 상점당 1개만 받을 수 있습니다.
+     * 쿠폰을 발행합니다. 상점별 eventTotalCount 범위 내에서만 발행되며, 유저는 상점당 1개만 받을 수 있습니다.
      * 동시 요청에 대한 정합성 보장을 위해 상점 레코드에 비관적 쓰기 락을 적용합니다.
      *
      * @param request 쿠폰 발행 요청 (storeId, userId)
@@ -45,7 +41,7 @@ class CouponService(
         }
 
         val issuedCount = couponRepository.countByStoreId(storeId)
-        if (issuedCount >= MAX_COUPONS_PER_STORE) {
+        if (issuedCount >= store.eventTotalCount) {
             throw CouponLimitExceededException(storeId)
         }
 

@@ -50,6 +50,14 @@ management:
     sampling:
       probability: 1.0
 
+otel:
+  exporter:
+    otlp:
+      endpoint: http://${OTEL_COLLECTOR_HOST:otel-collector}:4318
+      protocol: http/protobuf
+  logs:
+    exporter: otlp
+
 logging:
   level:
     root: INFO

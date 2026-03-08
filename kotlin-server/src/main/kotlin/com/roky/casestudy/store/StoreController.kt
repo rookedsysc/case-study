@@ -28,5 +28,5 @@ class StoreController(private val storeService: StoreService) {
     @PostMapping("/bulk")
     @ResponseStatus(HttpStatus.CREATED)
     fun createStoresBulk(@Valid @RequestBody request: BulkCreateStoresRequest): BulkCreateStoresResponse =
-        storeService.createStoresBulk(request.count)
+        storeService.createStoresBulk(request.count, request.eventTotalCount)
 }

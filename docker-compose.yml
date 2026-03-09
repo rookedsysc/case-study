@@ -125,6 +125,125 @@ services:
           cpus: 1
           memory: 1G
 
+  redis-cluster-node-1:
+    image: redis:8.6-alpine
+    command:
+      - sh
+      - -c
+      - |
+        exec redis-server \
+          --port 6379 \
+          --requirepass ${REDIS_PASSWORD:-redispassword} \
+          --masterauth ${REDIS_PASSWORD:-redispassword} \
+          --cluster-enabled yes \
+          --cluster-config-file /data/nodes.conf \
+          --cluster-node-timeout 5000 \
+          --appendonly yes \
+          --protected-mode no
+    ports:
+      - "7001:6379"
+    volumes:
+      - redis-cluster-node-1-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1G
+
+  redis-cluster-node-2:
+    image: redis:8.6-alpine
+    command:
+      - sh
+      - -c
+      - |
+        exec redis-server \
+          --port 6379 \
+          --requirepass ${REDIS_PASSWORD:-redispassword} \
+          --masterauth ${REDIS_PASSWORD:-redispassword} \
+          --cluster-enabled yes \
+          --cluster-config-file /data/nodes.conf \
+          --cluster-node-timeout 5000 \
+          --appendonly yes \
+          --protected-mode no
+    ports:
+      - "7002:6379"
+    volumes:
+      - redis-cluster-node-2-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1G
+
+  redis-cluster-node-3:
+    image: redis:8.6-alpine
+    command:
+      - sh
+      - -c
+      - |
+        exec redis-server \
+          --port 6379 \
+          --requirepass ${REDIS_PASSWORD:-redispassword} \
+          --masterauth ${REDIS_PASSWORD:-redispassword} \
+          --cluster-enabled yes \
+          --cluster-config-file /data/nodes.conf \
+          --cluster-node-timeout 5000 \
+          --appendonly yes \
+          --protected-mode no
+    ports:
+      - "7003:6379"
+    volumes:
+      - redis-cluster-node-3-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1G
+
+  redis-cluster-init:
+    image: redis:8.6-alpine
+    command:
+      - sh
+      - -c
+      - |
+        if redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-1 -p 6379 cluster info | grep -q "cluster_state:ok"; then
+          exit 0
+        fi
+        until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-1 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
+        until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-2 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
+        until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-3 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
+        yes yes | redis-cli --cluster create \
+          redis-cluster-node-1:6379 \
+          redis-cluster-node-2:6379 \
+          redis-cluster-node-3:6379 \
+          --cluster-replicas 0 \
+          -a ${REDIS_PASSWORD:-redispassword}
+    depends_on:
+      redis-cluster-node-1:
+        condition: service_started
+      redis-cluster-node-2:
+        condition: service_started
+      redis-cluster-node-3:
+        condition: service_started
+
+  redis-cluster-proxy:
+    image: kornrunner/redis-cluster-proxy:latest
+    platform: linux/amd64
+    command:
+      - --port
+      - "7777"
+      - --auth
+      - ${REDIS_PASSWORD:-redispassword}
+      - redis-cluster-node-1:6379,redis-cluster-node-2:6379,redis-cluster-node-3:6379
+    ports:
+      - "7777:7777"
+    depends_on:
+      redis-cluster-init:
+        condition: service_completed_successfully
+
 volumes:
   mysql-data:
   redis-data:
+  redis-cluster-node-1-data:
+  redis-cluster-node-2-data:
+  redis-cluster-node-3-data:

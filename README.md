@@ -1,0 +1,24 @@
+# 인프라 구성 요약
+
+이 프로젝트는 Docker Compose 기준으로 애플리케이션, 데이터 스토어, Redis Cluster, 관측 스택을 한 번에 실행한다.
+
+## 핵심 서비스
+
+- 애플리케이션: `app-1~3`(Spring Boot) + `nginx`(로드밸런싱)
+- 데이터 스토어: `mysql`, `redis`(단일)
+- Redis Cluster: `redis-cluster-node-1~3`, `redis-cluster-init`, `redis-cluster-proxy`
+- 관측(Observability): `prometheus`, `grafana`, `loki`, `otel-collector`, `node-exporter`, `mysqld-exporter`, `redis-exporter`
+
+## 주요 포트
+
+- 앱 진입: `80` (`nginx`)
+- MySQL: `3306`
+- Redis 단일: `6379`
+- Redis Cluster 노드: `7001~7003`
+- Redis Cluster Proxy: `7777`
+- Grafana/Prometheus/Loki: `3000` / `9090` / `3100`
+
+## Redis Cluster 연결
+
+- Docker 내부: `redis://:redispassword@redis-cluster-proxy:7777`
+- localhost: `redis-cli -h localhost -p 7777 -a redispassword`

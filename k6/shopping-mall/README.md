@@ -49,22 +49,6 @@ data_sent...............................: 4.7 MB 13 kB/s
 - DB 락 대기 시간, 커넥션 풀, Tomcat 스레드 사용량을 함께 점검한다.
 - VU 수와 이벤트 수량을 단계적으로 조정해 병목 구간을 다시 측정한다.
 
-## Redis Cluster 테스트 구성
+## Redis Cluster 연결 가이드
 
-- 기존 단일 `redis` 서비스는 유지하고, 별도로 `redis-cluster-node-1~3`와 `redis-cluster-proxy`를 추가했다.
-- 키 분산은 Redis Cluster slot 기반으로 처리하고, 클라이언트는 `redis-cluster-proxy` 하나만 바라보면 된다.
-
-### Docker 내부에서 연결
-
-- 같은 compose 네트워크에 있는 컨테이너는 `redis-cluster-proxy:7777` 로 접속하면 된다.
-- 예시: `redis://:redispassword@redis-cluster-proxy:7777`
-
-### localhost 에서 연결
-
-- 호스트 머신에서는 `localhost:7777` 로 접속하면 된다.
-- 예시: `redis-cli -h localhost -p 7777 -a redispassword`
-
-### 참고
-
-- Cluster 자체를 직접 확인하려면 `redis-cluster-node-1~3` 의 `7001~7003` 포트를 사용할 수 있다.
-- Cluster 생성은 `redis-cluster-init` 서비스가 자동으로 수행한다.
+- Redis Cluster 연결 가이드는 프로젝트 루트 `README.md`를 참고한다.

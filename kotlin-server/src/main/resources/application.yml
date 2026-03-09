@@ -40,6 +40,44 @@ spring:
 
 server:
   port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+      otlp:
+        enabled: true
+        url: http://${OTEL_COLLECTOR_HOST:otel-collector}:4318/v1/metrics
+        step: 10s
+    tags:
+      application: ${spring.application.name}
+      instance: ${HOSTNAME:unknown}
+  tracing:
+    sampling:
+      probability: 1.0
+
+otel:
+  exporter:
+    otlp:
+      endpoint: http://${OTEL_COLLECTOR_HOST:otel-collector}:4318
+      protocol: http/protobuf
+  logs:
+    exporter: otlp
+
+logging:
+  level:
+    root: INFO
+
   tomcat:
     # 인스턴스 3개 기준 총 1200 스레드 → 1000 VU 동시 요청 수용
     threads:

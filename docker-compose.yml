@@ -257,7 +257,7 @@ services:
       - ${REDIS_PASSWORD:-redispassword}
       - redis-cluster-node-1:6379,redis-cluster-node-2:6379,redis-cluster-node-3:6379
     ports:
-      - "7777:7777"
+      - "${REDIS_CLUSTER_PROXY_HOST_PORT:-7777}:7777"
     depends_on:
       redis-cluster-init:
         condition: service_completed_successfully

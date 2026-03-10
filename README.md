@@ -15,10 +15,10 @@
 - MySQL: `3306`
 - Redis 단일: `6379`
 - Redis Cluster 노드: `7001~7003`
-- Redis Cluster Proxy: `7777`
+- Redis Cluster Proxy: `7777` (기본값, `.env`에서 `REDIS_CLUSTER_PROXY_HOST_PORT`로 변경 가능)
 - Grafana/Prometheus/Loki: `3000` / `9090` / `3100`
 
 ## Redis Cluster 연결
 
 - Docker 내부: `redis://:redispassword@redis-cluster-proxy:7777`
-- localhost: `redis-cli -h localhost -p 7777 -a redispassword`
+- localhost: `redis-cli -h localhost -p ${REDIS_CLUSTER_PROXY_HOST_PORT:-7777} -a redispassword`

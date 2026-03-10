@@ -32,6 +32,10 @@ services:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
       - OTEL_COLLECTOR_HOST=otel-collector
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_SERVICE_NAME=case-study
     depends_on:
       mysql:
         condition: service_healthy
@@ -59,6 +63,10 @@ services:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
       - OTEL_COLLECTOR_HOST=otel-collector
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_SERVICE_NAME=case-study
     depends_on:
       mysql:
         condition: service_healthy
@@ -86,6 +94,10 @@ services:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
       - OTEL_COLLECTOR_HOST=otel-collector
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_SERVICE_NAME=case-study
     depends_on:
       mysql:
         condition: service_healthy
@@ -343,7 +355,10 @@ services:
   mysqld-exporter:
     image: prom/mysqld-exporter:v0.16.0
     environment:
-      - DATA_SOURCE_NAME=root:${MYSQL_ROOT_PASSWORD:-rootpassword}@(mysql:3306)/
+      - MYSQLD_EXPORTER_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+    command:
+      - "--mysqld.address=mysql:3306"
+      - "--mysqld.username=root"
     ports:
       - "9104:9104"
     depends_on:

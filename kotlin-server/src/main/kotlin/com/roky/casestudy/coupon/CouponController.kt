@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/coupons")
+@RequestMapping("/api/coupons/pessimistic-lock")
 class CouponController(private val couponService: CouponService) {
 
     /** 쿠폰을 발행합니다. */

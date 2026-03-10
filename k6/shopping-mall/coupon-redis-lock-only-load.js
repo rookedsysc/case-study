@@ -16,21 +16,21 @@ const CONFIG = {
   tags: {
     createStores: { phase: "setup", kind: "create_stores_bulk" },
     createUsers: { phase: "setup", kind: "create_users_bulk" },
-    issueCoupon: { phase: "measure", kind: "issue_coupon" },
+    issueCoupon: { phase: "measure", kind: "issue_coupon_redis_lock" },
   },
 };
 
 export const options = {
   scenarios: {
-    coupon_issue_only: {
+    coupon_issue_only_redis_lock: {
       executor: "constant-vus",
       vus: CONFIG.vus,
       duration: CONFIG.duration,
     },
   },
   thresholds: {
-    "http_req_failed{phase:measure,kind:issue_coupon}": ["rate < 0.01"],
-    "http_req_duration{phase:measure,kind:issue_coupon}": ["p(95) < 500"],
+    "http_req_failed{phase:measure,kind:issue_coupon_redis_lock}": ["rate < 0.01"],
+    "http_req_duration{phase:measure,kind:issue_coupon_redis_lock}": ["p(95) < 500"],
   },
 };
 
@@ -123,7 +123,7 @@ export function setup() {
 export default function issueCouponOnly(data) {
   const userId = getAssignedUserId(data.userIds);
   const response = postJson(
-    "/api/coupons",
+    "/api/coupons/redis-lock",
     { storeId: data.storeId, userId },
     CONFIG.tags.issueCoupon,
     ISSUE_COUPON_EXPECTED_STATUSES,

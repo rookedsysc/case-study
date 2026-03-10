@@ -1,5 +1,7 @@
 package com.roky.casestudy.common
 
+import com.roky.casestudy.coupon.exception.CouponIssueInProgressException
+import com.roky.casestudy.coupon.exception.CouponLockReleaseFailedException
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import org.springframework.http.HttpStatus
@@ -25,6 +27,14 @@ class GlobalExceptionHandler {
     @ExceptionHandler(CouponLimitExceededException::class)
     fun handleCouponLimit(e: CouponLimitExceededException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.GONE).body(ErrorResponse(e.message ?: "쿠폰 수량 초과"))
+
+    @ExceptionHandler(CouponIssueInProgressException::class)
+    fun handleCouponIssueInProgress(e: CouponIssueInProgressException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(e.message ?: "쿠폰 발급 처리 중"))
+
+    @ExceptionHandler(CouponLockReleaseFailedException::class)
+    fun handleCouponLockReleaseFailed(e: CouponLockReleaseFailedException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorResponse(e.message ?: "쿠폰 락 해제 실패"))
 }
 
 data class ErrorResponse(val message: String)

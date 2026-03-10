@@ -37,7 +37,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service_name=~\".+\"} | detected_level = `error`",
+          "expr": "{service_name=~\".+\"} |~ \"(?i)(error|exception|fail)\"",
           "legendFormat": ""
         }
       ]

@@ -39,7 +39,7 @@ spring:
       password: ${REDIS_PASSWORD:redispassword}
 
 server:
-  port: 8080
+  port: ${APP_PORT:8080}
 
 management:
   endpoints:

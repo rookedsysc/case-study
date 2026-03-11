@@ -3,8 +3,10 @@ services:
     image: nginx:alpine
     ports:
       - "${NGINX_HOST_PORT:-80}:80"
+    environment:
+      - APP_PORT=${APP_PORT:-8080}
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       app-1:
         condition: service_started
@@ -23,6 +25,7 @@ services:
     expose:
       - "${APP_PORT:-8080}"
     environment:
+      - APP_PORT=${APP_PORT:-8080}
       - MYSQL_HOST=mysql
       - MYSQL_PORT=${MYSQL_PORT:-3306}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
@@ -54,6 +57,7 @@ services:
     expose:
       - "${APP_PORT:-8080}"
     environment:
+      - APP_PORT=${APP_PORT:-8080}
       - MYSQL_HOST=mysql
       - MYSQL_PORT=${MYSQL_PORT:-3306}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
@@ -85,6 +89,7 @@ services:
     expose:
       - "${APP_PORT:-8080}"
     environment:
+      - APP_PORT=${APP_PORT:-8080}
       - MYSQL_HOST=mysql
       - MYSQL_PORT=${MYSQL_PORT:-3306}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
@@ -227,18 +232,43 @@ services:
       - sh
       - -c
       - |
-        if redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-1 -p 6379 cluster info | grep -q "cluster_state:ok"; then
+        cluster_ok() {
+          redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-1 -p 6379 cluster info 2>/dev/null | grep -q "cluster_state:ok"
+        }
+
+        if cluster_ok; then
           exit 0
         fi
+
         until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-1 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
         until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-2 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
         until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-3 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
-        yes yes | redis-cli --cluster create \
+
+        if cluster_ok; then
+          exit 0
+        fi
+
+        for node in redis-cluster-node-1 redis-cluster-node-2 redis-cluster-node-3; do
+          redis-cli -a ${REDIS_PASSWORD:-redispassword} -h "$${node}" -p 6379 cluster reset hard >/dev/null 2>&1 || true
+          redis-cli -a ${REDIS_PASSWORD:-redispassword} -h "$${node}" -p 6379 flushall >/dev/null 2>&1 || true
+        done
+
+        if yes yes | redis-cli --cluster create \
           redis-cluster-node-1:6379 \
           redis-cluster-node-2:6379 \
           redis-cluster-node-3:6379 \
           --cluster-replicas 0 \
-          -a ${REDIS_PASSWORD:-redispassword}
+          -a ${REDIS_PASSWORD:-redispassword}; then
+          exit 0
+        fi
+
+        sleep 1
+        if cluster_ok; then
+          exit 0
+        fi
+
+        echo "redis cluster initialization failed"
+        exit 1
     depends_on:
       redis-cluster-node-1:
         condition: service_started
@@ -288,11 +318,10 @@ services:
     image: prom/prometheus:v3.1.0
     ports:
       - "${PROMETHEUS_HOST_PORT:-9090}:9090"
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=15d"
-      - "--web.enable-lifecycle"
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+      - "sed 's|__APP_PORT__|${APP_PORT:-8080}|g' /etc/prometheus/prometheus.yml > /tmp/prometheus.yml && exec /bin/prometheus --config.file=/tmp/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --web.enable-lifecycle"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules:/etc/prometheus/rules:ro

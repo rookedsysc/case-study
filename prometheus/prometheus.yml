@@ -31,6 +31,6 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
       - targets:
-          - "app-1:8080"
-          - "app-2:8080"
-          - "app-3:8080"
+          - "app-1:__APP_PORT__"
+          - "app-2:__APP_PORT__"
+          - "app-3:__APP_PORT__"

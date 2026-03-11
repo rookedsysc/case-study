@@ -5,7 +5,7 @@ import exec from "k6/execution";
 const ISSUE_COUPON_EXPECTED_STATUSES = [201, 409, 410];
 
 const CONFIG = {
-  baseUrl: __ENV.BASE_URL || "http://localhost:80",
+  baseUrl: __ENV.BASE_URL || "http://localhost:38080",
   headers: { "Content-Type": "application/json" },
   storeCount: 1,
   storeEventTotalCount: 1000,

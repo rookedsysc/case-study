@@ -14,10 +14,11 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/coupons/redis-lock")
 class CouponRedisLockController(
     private val couponRedisLockService: CouponRedisLockService,
-) {
+) : CouponRedisLockControllerDocs {
     /** Redis 락 기반으로 쿠폰을 발행합니다. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun issueCoupon(@Valid @RequestBody request: IssueCouponRequest): CouponResponse =
-        couponRedisLockService.issueCoupon(request)
+    override fun issueCoupon(
+        @Valid @RequestBody request: IssueCouponRequest,
+    ): CouponResponse = couponRedisLockService.issueCoupon(request)
 }

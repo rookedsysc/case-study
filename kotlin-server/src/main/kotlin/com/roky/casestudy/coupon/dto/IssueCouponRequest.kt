@@ -8,7 +8,6 @@ data class IssueCouponRequest(
     /** 쿠폰을 발행할 상점 ID (필수) */
     @field:NotNull
     val storeId: UUID?,
-
     /** 쿠폰을 받을 유저 ID (필수) */
     @field:NotNull
     val userId: UUID?,

@@ -17,6 +17,10 @@ const CONFIG = {
     createStores: { phase: "setup", kind: "create_stores_bulk" },
     createUsers: { phase: "setup", kind: "create_users_bulk" },
     issueCoupon: { phase: "measure", kind: "issue_coupon_pessimistic_lock" },
+    readStatistics: {
+      phase: "verify",
+      kind: "read_coupon_store_statistics_pessimistic_lock",
+    },
   },
 };
 
@@ -44,6 +48,14 @@ function parseJson(response) {
 
 function postJson(path, payload, tags, expectedStatuses = [201]) {
   return http.post(`${CONFIG.baseUrl}${path}`, JSON.stringify(payload), {
+    headers: CONFIG.headers,
+    tags,
+    responseCallback: http.expectedStatuses(...expectedStatuses),
+  });
+}
+
+function getJson(path, tags, expectedStatuses = [200]) {
+  return http.get(`${CONFIG.baseUrl}${path}`, {
     headers: CONFIG.headers,
     tags,
     responseCallback: http.expectedStatuses(...expectedStatuses),
@@ -118,6 +130,35 @@ export function setup() {
     storeId: createStoreId(),
     userIds: createUserIds(),
   };
+}
+
+export function teardown(data) {
+  const response = getJson(
+    `/api/coupons/stores/${data.storeId}/statistics`,
+    CONFIG.tags.readStatistics,
+  );
+  const body = parseJson(response);
+
+  const isValid = check(response, {
+    "통계 조회 성공": (result) => result.status === 200,
+    "통계 응답 storeId 일치": () => body !== null && body.storeId === data.storeId,
+    "통계 응답 총 발급 수량 일치": () =>
+      body !== null && body.eventTotalCount === CONFIG.storeEventTotalCount,
+    "통계 응답 발급 수량이 목표 수량과 일치": () =>
+      body !== null && body.issuedCouponCount === CONFIG.storeEventTotalCount,
+    "통계 응답 잔여 수량 0": () =>
+      body !== null && body.remainingCouponCount === 0,
+    "통계 응답 상위 유저 중복 발급 없음": () =>
+      body !== null &&
+      Array.isArray(body.topIssuedUsers) &&
+      body.topIssuedUsers.every((user) => user.issuedCouponCount === 1),
+  });
+
+  if (!isValid) {
+    throw new Error(
+      `쿠폰 통계 검증에 실패했습니다: ${response.status} ${response.body}`,
+    );
+  }
 }
 
 export default function issueCouponOnly(data) {

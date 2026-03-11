@@ -1,9 +1,9 @@
 package com.roky.casestudy.coupon
 
+import org.springframework.core.io.ClassPathResource
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Component
-import org.springframework.core.io.ClassPathResource
 import java.time.Duration
 import java.util.UUID
 
@@ -15,15 +15,17 @@ class CouponRedisCoordinator(
     private val userLockWaitTimeout = Duration.ofSeconds(2)
     private val userLockTtl = Duration.ofSeconds(5)
 
-    private val lockReleaseScript = DefaultRedisScript<Long>().apply {
-        setLocation(ClassPathResource("lua/coupon-lock-release.lua"))
-        resultType = Long::class.java
-    }
+    private val lockReleaseScript =
+        DefaultRedisScript<Long>().apply {
+            setLocation(ClassPathResource("lua/coupon-lock-release.lua"))
+            resultType = Long::class.java
+        }
 
-    private val stockDecreaseScript = DefaultRedisScript<Long>().apply {
-        setLocation(ClassPathResource("lua/coupon-stock-decrease.lua"))
-        resultType = Long::class.java
-    }
+    private val stockDecreaseScript =
+        DefaultRedisScript<Long>().apply {
+            setLocation(ClassPathResource("lua/coupon-stock-decrease.lua"))
+            resultType = Long::class.java
+        }
 
     fun tryAcquireUserLock(userId: UUID): String? {
         val deadlineNanos = System.nanoTime() + userLockWaitTimeout.toNanos()
@@ -38,17 +40,25 @@ class CouponRedisCoordinator(
         return null
     }
 
-    fun releaseUserLock(userId: UUID, lockValue: String): Boolean {
+    fun releaseUserLock(
+        userId: UUID,
+        lockValue: String,
+    ): Boolean {
         val result = redisTemplate.execute(lockReleaseScript, listOf(userLockKey(userId)), lockValue)
         return result == 1L
     }
 
-    fun decreaseRemainingStock(storeId: UUID, eventTotalCount: Long, issuedCountLoader: () -> Long): Boolean {
+    fun decreaseRemainingStock(
+        storeId: UUID,
+        eventTotalCount: Long,
+        issuedCountLoader: () -> Long,
+    ): Boolean {
         initializeRemainingStockIfAbsent(storeId, eventTotalCount, issuedCountLoader)
-        val result = redisTemplate.execute(
-            stockDecreaseScript,
-            listOf(stockKey(storeId)),
-        )
+        val result =
+            redisTemplate.execute(
+                stockDecreaseScript,
+                listOf(stockKey(storeId)),
+            )
         return result == 1L
     }
 

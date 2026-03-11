@@ -1,13 +1,18 @@
 package com.roky.casestudy.coupon
 
 import com.roky.casestudy.coupon.dto.CouponResponse
+import com.roky.casestudy.coupon.dto.CouponStoreStatisticsResponse
 import com.roky.casestudy.coupon.dto.IssueCouponRequest
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import com.roky.casestudy.store.StoreRepository
 import com.roky.casestudy.user.AppUserRepository
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
+
+private const val STORE_COUPON_STATISTICS_TOP_USER_LIMIT = 10
 
 @Service
 class CouponService(
@@ -30,11 +35,15 @@ class CouponService(
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
 
-        val store = storeRepository.findByIdWithLock(storeId)
-            .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
+        val store =
+            storeRepository
+                .findByIdWithLock(storeId)
+                .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
 
-        val user = appUserRepository.findById(userId)
-            .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
+        val user =
+            appUserRepository
+                .findById(userId)
+                .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
 
         if (couponRepository.existsByStoreIdAndUserId(storeId, userId)) {
             throw DuplicateCouponException(storeId, userId)
@@ -47,5 +56,29 @@ class CouponService(
 
         val coupon = CouponEntity(store = store, user = user)
         return CouponMapper.toResponse(couponRepository.save(coupon))
+    }
+
+    /** 특정 상점의 쿠폰 발급 현황을 조회합니다. */
+    @Transactional(readOnly = true)
+    fun getStoreCouponStatistics(storeId: UUID): CouponStoreStatisticsResponse {
+        val store =
+            storeRepository
+                .findById(storeId)
+                .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
+
+        val issuedCouponCount = couponRepository.countByStoreId(storeId)
+        val topIssuedUsers =
+            couponRepository.findTopIssuedUsersByStoreId(
+                storeId = storeId,
+                pageable = PageRequest.of(0, STORE_COUPON_STATISTICS_TOP_USER_LIMIT),
+            )
+
+        return CouponStoreStatisticsResponse(
+            storeId = store.id,
+            eventTotalCount = store.eventTotalCount,
+            issuedCouponCount = issuedCouponCount,
+            remainingCouponCount = (store.eventTotalCount - issuedCouponCount).coerceAtLeast(0),
+            topIssuedUsers = topIssuedUsers,
+        )
     }
 }

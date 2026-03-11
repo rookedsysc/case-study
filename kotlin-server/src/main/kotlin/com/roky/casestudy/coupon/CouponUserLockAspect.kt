@@ -18,10 +18,14 @@ class CouponUserLockAspect(
     private val parser = SpelExpressionParser()
 
     @Around("@annotation(couponUserLock)")
-    fun withUserLock(joinPoint: ProceedingJoinPoint, couponUserLock: CouponUserLock): Any? {
+    fun withUserLock(
+        joinPoint: ProceedingJoinPoint,
+        couponUserLock: CouponUserLock,
+    ): Any? {
         val userId = resolveUserId(joinPoint, couponUserLock.userIdExpression)
-        val lockValue = couponRedisCoordinator.tryAcquireUserLock(userId)
-            ?: throw CouponIssueInProgressException(userId)
+        val lockValue =
+            couponRedisCoordinator.tryAcquireUserLock(userId)
+                ?: throw CouponIssueInProgressException(userId)
 
         return try {
             joinPoint.proceed()
@@ -33,16 +37,21 @@ class CouponUserLockAspect(
         }
     }
 
-    private fun resolveUserId(joinPoint: ProceedingJoinPoint, expression: String): UUID {
-        val context = StandardEvaluationContext().apply {
-            joinPoint.args.forEachIndexed { index, arg ->
-                setVariable("p$index", arg)
-                setVariable("a$index", arg)
+    private fun resolveUserId(
+        joinPoint: ProceedingJoinPoint,
+        expression: String,
+    ): UUID {
+        val context =
+            StandardEvaluationContext().apply {
+                joinPoint.args.forEachIndexed { index, arg ->
+                    setVariable("p$index", arg)
+                    setVariable("a$index", arg)
+                }
             }
-        }
 
-        val value = parser.parseExpression(expression).getValue(context)
-            ?: throw IllegalArgumentException("userIdExpression 결과가 비어 있습니다")
+        val value =
+            parser.parseExpression(expression).getValue(context)
+                ?: throw IllegalArgumentException("userIdExpression 결과가 비어 있습니다")
 
         return when (value) {
             is UUID -> value

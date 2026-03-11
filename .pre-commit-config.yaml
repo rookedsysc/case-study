@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: kotlin-server-spotless-apply
+        name: kotlin-server spotlessApply
+        entry: ./kotlin-server/gradlew -p kotlin-server spotlessApply
+        language: system
+        pass_filenames: false
+        files: ^kotlin-server/.*\.(kt|kts)$
+      - id: kotlin-server-spotless-check
+        name: kotlin-server spotlessCheck
+        entry: ./kotlin-server/gradlew -p kotlin-server spotlessCheck
+        language: system
+        pass_filenames: false
+        files: ^kotlin-server/.*\.(kt|kts)$

@@ -22,3 +22,13 @@
 
 - Docker 내부: `redis://:redispassword@redis-cluster-proxy:7777`
 - localhost: `redis-cli -h localhost -p ${REDIS_CLUSTER_PROXY_HOST_PORT:-7777} -a redispassword`
+
+## 코드 포맷과 pre-commit
+
+- Kotlin 서버 포맷 검사: `./gradlew spotlessCheck` (`kotlin-server` 디렉터리에서 실행)
+- Kotlin 서버 자동 포맷: `./gradlew spotlessApply` (`kotlin-server` 디렉터리에서 실행)
+- pre-commit 설치: `pip install pre-commit` 또는 `brew install pre-commit`
+- Git hook 등록: 저장소 루트에서 `pre-commit install`
+- 수동 훅 실행: 저장소 루트에서 `pre-commit run --all-files`
+
+pre-commit 훅은 `kotlin-server`의 `*.kt`, `*.kts` 파일이 변경된 커밋에서 `spotlessApply`와 `spotlessCheck`를 순서대로 실행합니다.

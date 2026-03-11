@@ -1,8 +1,8 @@
 package com.roky.casestudy.common
 
 import com.roky.casestudy.coupon.exception.CouponIssueInProgressException
-import com.roky.casestudy.coupon.exception.CouponLockReleaseFailedException
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
+import com.roky.casestudy.coupon.exception.CouponLockReleaseFailedException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
-
     @ExceptionHandler(NoSuchElementException::class)
     fun handleNotFound(e: NoSuchElementException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse(e.message ?: "리소스를 찾을 수 없습니다"))
@@ -37,4 +36,6 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorResponse(e.message ?: "쿠폰 락 해제 실패"))
 }
 
-data class ErrorResponse(val message: String)
+data class ErrorResponse(
+    val message: String,
+)

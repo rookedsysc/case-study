@@ -11,9 +11,10 @@ class CaseStudyApplication
 fun main(args: Array<String>) {
     runApplication<CaseStudyApplication>(*args)
 
-    val openTelemetrySdk = AutoConfiguredOpenTelemetrySdk
-        .builder()
-        .build()
-        .openTelemetrySdk
+    val openTelemetrySdk =
+        AutoConfiguredOpenTelemetrySdk
+            .builder()
+            .build()
+            .openTelemetrySdk
     OpenTelemetryAppender.install(openTelemetrySdk)
 }

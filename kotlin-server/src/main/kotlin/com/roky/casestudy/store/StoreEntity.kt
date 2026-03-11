@@ -12,13 +12,10 @@ import java.util.UUID
 class StoreEntity(
     @Id
     val id: UUID = UUID.randomUUID(),
-
     @Column(nullable = false)
     val name: String,
-
     @Column(nullable = false)
     val eventTotalCount: Long = DEFAULT_EVENT_TOTAL_COUNT,
-
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 ) {

@@ -12,10 +12,8 @@ import java.util.UUID
 class AppUserEntity(
     @Id
     val id: UUID = UUID.randomUUID(),
-
     @Column(nullable = false)
     val name: String,
-
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 )

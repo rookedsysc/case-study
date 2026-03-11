@@ -25,21 +25,26 @@ class CouponRedisLockService(
         var stockDecreased = false
 
         try {
-            val store = storeRepository.findById(storeId)
-                .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
+            val store =
+                storeRepository
+                    .findById(storeId)
+                    .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
 
-            val user = appUserRepository.findById(userId)
-                .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
+            val user =
+                appUserRepository
+                    .findById(userId)
+                    .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
 
             if (couponRepository.existsByStoreIdAndUserId(storeId, userId)) {
                 throw DuplicateCouponException(storeId, userId)
             }
 
-            stockDecreased = couponRedisCoordinator.decreaseRemainingStock(
-                storeId = storeId,
-                eventTotalCount = store.eventTotalCount,
-                issuedCountLoader = { couponRepository.countByStoreId(storeId) },
-            )
+            stockDecreased =
+                couponRedisCoordinator.decreaseRemainingStock(
+                    storeId = storeId,
+                    eventTotalCount = store.eventTotalCount,
+                    issuedCountLoader = { couponRepository.countByStoreId(storeId) },
+                )
             if (!stockDecreased) {
                 throw CouponLimitExceededException(storeId)
             }

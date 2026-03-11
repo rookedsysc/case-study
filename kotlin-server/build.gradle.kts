@@ -1,4 +1,5 @@
 plugins {
+    id("com.diffplug.spotless") version "7.2.1"
     kotlin("jvm") version "2.2.21"
     kotlin("plugin.spring") version "2.2.21"
     id("org.springframework.boot") version "4.0.3"
@@ -63,6 +64,18 @@ allOpen {
     annotation("jakarta.persistence.Entity")
     annotation("jakarta.persistence.MappedSuperclass")
     annotation("jakarta.persistence.Embeddable")
+}
+
+spotless {
+    kotlin {
+        target("src/**/*.kt")
+        ktlint("1.8.0")
+    }
+
+    kotlinGradle {
+        target("*.gradle.kts")
+        ktlint("1.8.0")
+    }
 }
 
 tasks.withType<Test> {

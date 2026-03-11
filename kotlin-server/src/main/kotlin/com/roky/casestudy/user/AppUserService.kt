@@ -7,22 +7,19 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
-class AppUserService(private val appUserRepository: AppUserRepository) {
-
-    /** 새 유저를 생성합니다. */
-    fun createUser(request: CreateAppUserRequest): AppUserResponse {
-        val user = AppUserEntity(name = request.name)
-        return AppUserMapper.toResponse(appUserRepository.save(user))
-    }
-
+class AppUserService(
+    private val appUserRepository: AppUserRepository,
+) {
     /**
      * 유저를 ID로 조회합니다.
      *
      * @throws NoSuchElementException 유저가 존재하지 않는 경우
      */
     fun getUser(id: UUID): AppUserResponse {
-        val user = appUserRepository.findById(id)
-            .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $id") }
+        val user =
+            appUserRepository
+                .findById(id)
+                .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $id") }
         return AppUserMapper.toResponse(user)
     }
 

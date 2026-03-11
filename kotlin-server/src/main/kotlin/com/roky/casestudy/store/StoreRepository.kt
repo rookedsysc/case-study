@@ -8,7 +8,6 @@ import java.util.Optional
 import java.util.UUID
 
 interface StoreRepository : JpaRepository<StoreEntity, UUID> {
-
     /**
      * 상점을 비관적 쓰기 락으로 조회합니다.
      * 쿠폰 발행 시 동시성 제어를 위해 사용됩니다.

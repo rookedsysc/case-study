@@ -141,8 +141,36 @@
       "fieldConfig": {
         "defaults": { "unit": "ops" }
       }
+    },
+    {
+      "id": 7,
+      "title": "가용성 및 연결 포화도",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "up{job=\"mysqld-exporter\"} * 100",
+          "legendFormat": "Exporter Up %"
+        },
+        {
+          "expr": "mysql_global_status_threads_running / mysql_global_variables_max_connections * 100",
+          "legendFormat": "Threads Running / Max Connections %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        }
+      }
     }
   ],
   "schemaVersion": 38,
-  "version": 1
+  "version": 2
 }

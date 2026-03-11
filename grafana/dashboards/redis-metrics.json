@@ -133,8 +133,51 @@
           }
         }
       }
+    },
+    {
+      "id": 7,
+      "title": "가용성 및 포화도",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "up{job=\"redis-exporter\"} * 100",
+          "legendFormat": "Exporter Up %"
+        },
+        {
+          "expr": "redis_memory_used_bytes / redis_memory_max_bytes * 100",
+          "legendFormat": "Memory Usage %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 85 },
+              { "color": "red", "value": 95 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Rejected Connections",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(redis_rejected_connections_total[5m])",
+          "legendFormat": "Rejected/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
     }
   ],
   "schemaVersion": 38,
-  "version": 1
+  "version": 2
 }

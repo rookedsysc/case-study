@@ -118,6 +118,12 @@ services:
 
   mysql:
     image: mysql:8.4.8
+    command:
+      - "--slow-query-log=ON"
+      - "--long_query_time=2"
+      - "--log-queries-not-using-indexes=ON"
+      - "--slow_query_log_file=/var/lib/mysql/slow.log"
+      - "--performance-schema=ON"
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
@@ -388,6 +394,10 @@ services:
     command:
       - "--mysqld.address=mysql:3306"
       - "--mysqld.username=root"
+      - "--collect.perf_schema.eventsstatements"
+      - "--collect.perf_schema.tablelocks"
+      - "--collect.perf_schema.tableiowaits"
+      - "--collect.perf_schema.eventswaits"
     ports:
       - "${MYSQLD_EXPORTER_HOST_PORT:-9104}:9104"
     depends_on:

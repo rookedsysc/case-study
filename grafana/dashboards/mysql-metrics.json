@@ -32,9 +32,24 @@
     },
     {
       "id": 2,
-      "title": "연결 수",
+      "title": "Slow Query 누적",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "mysql_global_status_slow_queries",
+          "legendFormat": "Slow Queries Total"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "id": 3,
+      "title": "연결 수",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
         {
           "expr": "mysql_global_status_threads_connected",
@@ -51,30 +66,6 @@
       ],
       "fieldConfig": {
         "defaults": { "unit": "short" }
-      }
-    },
-    {
-      "id": 3,
-      "title": "InnoDB 버퍼 풀 히트율",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "targets": [
-        {
-          "expr": "(1 - rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m])) * 100",
-          "legendFormat": "Buffer Pool Hit Rate %"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 90 },
-              { "color": "green", "value": 99 }
-            ]
-          }
-        }
       }
     },
     {
@@ -98,9 +89,107 @@
     },
     {
       "id": 5,
-      "title": "테이블 스캔 비율",
+      "title": "DML 처리량 분류",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by (command) (rate(mysql_global_status_commands_total{command=~\"select|insert|update|delete\"}[5m]))",
+          "legendFormat": "{{command}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 6,
+      "title": "상위 쿼리 Digest 실행 빈도",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "topk(5, rate(mysql_perf_schema_events_statements_total[5m]))",
+          "legendFormat": "{{schema}} {{digest_text}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 7,
+      "title": "상위 쿼리 Digest 평균 지연",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "topk(5, rate(mysql_perf_schema_events_statements_seconds_total[5m]) / clamp_min(rate(mysql_perf_schema_events_statements_total[5m]), 0.001))",
+          "legendFormat": "{{schema}} {{digest_text}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "id": 8,
+      "title": "테이블 락 대기 시간",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum by (operation) (rate(mysql_perf_schema_sql_lock_waits_seconds_total[5m]))",
+          "legendFormat": "SQL {{operation}}"
+        },
+        {
+          "expr": "sum by (operation) (rate(mysql_perf_schema_external_lock_waits_seconds_total[5m]))",
+          "legendFormat": "External {{operation}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "id": 9,
+      "title": "테이블 I/O 대기 시간",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum by (operation) (rate(mysql_perf_schema_table_io_waits_seconds_total[5m]))",
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "id": 10,
+      "title": "임시 테이블 생성",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_created_tmp_tables[5m])",
+          "legendFormat": "Memory Tmp Tables/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_created_tmp_disk_tables[5m])",
+          "legendFormat": "Disk Tmp Tables/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 11,
+      "title": "테이블 스캔 비율",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
       "targets": [
         {
           "expr": "rate(mysql_global_status_select_full_join[5m])",
@@ -116,10 +205,10 @@
       }
     },
     {
-      "id": 6,
+      "id": 12,
       "title": "InnoDB 행 작업",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
       "targets": [
         {
           "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[5m])",
@@ -143,10 +232,29 @@
       }
     },
     {
-      "id": 7,
+      "id": 13,
+      "title": "연결 실패 및 중단",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_aborted_connects[5m])",
+          "legendFormat": "Aborted Connects/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_aborted_clients[5m])",
+          "legendFormat": "Aborted Clients/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 14,
       "title": "가용성 및 연결 포화도",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
       "targets": [
         {
           "expr": "up{job=\"mysqld-exporter\"} * 100",
@@ -169,8 +277,32 @@
           }
         }
       }
+    },
+    {
+      "id": 15,
+      "title": "InnoDB 버퍼 풀 히트율",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 56 },
+      "targets": [
+        {
+          "expr": "(1 - rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m])) * 100",
+          "legendFormat": "Buffer Pool Hit Rate %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      }
     }
   ],
   "schemaVersion": 38,
-  "version": 2
+  "version": 3
 }

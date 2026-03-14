@@ -15,30 +15,6 @@ import java.util.UUID
 
 @Tag(name = "shopping mall case", description = "쇼핑몰 케이스 스터디 API")
 interface StoreControllerDocs {
-    @Operation(summary = "상점 조회", description = "상점 ID로 상점 정보를 조회합니다.")
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "조회 성공",
-                content = [Content(schema = Schema(implementation = StoreResponse::class))],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "상점을 찾을 수 없음",
-                content = [Content(schema = Schema(implementation = ErrorResponse::class))],
-            ),
-        ],
-    )
-    fun getStore(
-        @Parameter(
-            description = "상점 ID",
-            required = true,
-            example = "550e8400-e29b-41d4-a716-446655440000",
-        )
-        id: UUID,
-    ): StoreResponse
-
     @Operation(summary = "상점 일괄 생성", description = "부하 테스트용 상점 데이터를 최대 1000개까지 일괄 생성합니다.")
     @ApiResponses(
         value = [

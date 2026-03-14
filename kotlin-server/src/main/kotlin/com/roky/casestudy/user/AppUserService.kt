@@ -11,19 +11,6 @@ class AppUserService(
     private val appUserRepository: AppUserRepository,
 ) {
     /**
-     * 유저를 ID로 조회합니다.
-     *
-     * @throws NoSuchElementException 유저가 존재하지 않는 경우
-     */
-    fun getUser(id: UUID): AppUserResponse {
-        val user =
-            appUserRepository
-                .findById(id)
-                .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $id") }
-        return AppUserMapper.toResponse(user)
-    }
-
-    /**
      * 유저를 count개 일괄 생성하고 생성된 ID 목록을 반환합니다.
      * 부하 테스트 사전 데이터 생성 용도로 사용됩니다.
      *

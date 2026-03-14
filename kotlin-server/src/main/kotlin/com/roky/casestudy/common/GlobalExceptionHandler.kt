@@ -1,8 +1,8 @@
 package com.roky.casestudy.common
 
+import com.roky.casestudy.coupon.exception.CouponCacheLoadLockTimeoutException
 import com.roky.casestudy.coupon.exception.CouponIssueInProgressException
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
-import com.roky.casestudy.coupon.exception.CouponLockReleaseFailedException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -31,9 +31,9 @@ class GlobalExceptionHandler {
     fun handleCouponIssueInProgress(e: CouponIssueInProgressException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(e.message ?: "쿠폰 발급 처리 중"))
 
-    @ExceptionHandler(CouponLockReleaseFailedException::class)
-    fun handleCouponLockReleaseFailed(e: CouponLockReleaseFailedException): ResponseEntity<ErrorResponse> =
-        ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorResponse(e.message ?: "쿠폰 락 해제 실패"))
+    @ExceptionHandler(CouponCacheLoadLockTimeoutException::class)
+    fun handleCouponCacheLoadLockTimeout(e: CouponCacheLoadLockTimeoutException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse(e.message ?: "캐시 로드 락 획득 타임아웃"))
 }
 
 data class ErrorResponse(

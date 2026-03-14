@@ -1,7 +1,6 @@
 package com.roky.casestudy.coupon
 
 import com.roky.casestudy.coupon.exception.CouponIssueInProgressException
-import com.roky.casestudy.coupon.exception.CouponLockReleaseFailedException
 import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.Around
 import org.aspectj.lang.annotation.Aspect
@@ -23,18 +22,7 @@ class CouponUserLockAspect(
         couponUserLock: CouponUserLock,
     ): Any? {
         val userId = resolveUserId(joinPoint, couponUserLock.userIdExpression)
-        val lockValue =
-            couponRedisCoordinator.tryAcquireUserLock(userId)
-                ?: throw CouponIssueInProgressException(userId)
-
-        return try {
-            joinPoint.proceed()
-        } finally {
-            val released = couponRedisCoordinator.releaseUserLock(userId, lockValue)
-            if (!released) {
-                throw CouponLockReleaseFailedException(userId)
-            }
-        }
+        return couponRedisCoordinator.withUserLock(userId) { joinPoint.proceed() }
     }
 
     private fun resolveUserId(

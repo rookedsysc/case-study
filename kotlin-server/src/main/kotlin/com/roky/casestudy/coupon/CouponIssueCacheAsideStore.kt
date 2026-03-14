@@ -5,8 +5,8 @@ import com.roky.casestudy.user.AppUserEntity
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 import java.time.Duration
-import java.util.concurrent.ThreadLocalRandom
 import java.util.UUID
+import java.util.concurrent.ThreadLocalRandom
 
 @Component
 class CouponIssueCacheAsideStore(
@@ -16,19 +16,19 @@ class CouponIssueCacheAsideStore(
     fun getStoreSnapshotWithShortLock(
         storeId: UUID,
         loader: () -> StoreEntity,
-    ): CachedStoreSnapshot {
-        return couponRedisCoordinator.loadWithShortLock(
+    ): CachedStoreSnapshot =
+        couponRedisCoordinator.loadWithShortLock(
             lockKey = couponRedisCoordinator.storeSnapshotLoadLockKey(storeId),
             readCached = { readStoreSnapshot(storeId) },
             loadAndCache = {
                 val store = loader()
                 val snapshot = CachedStoreSnapshot(storeId = store.id, eventTotalCount = store.eventTotalCount)
-                redisTemplate.opsForValue()
+                redisTemplate
+                    .opsForValue()
                     .set(storeCacheKey(storeId), snapshot.eventTotalCount.toString(), cacheTtlWithJitter())
                 snapshot
             },
         )
-    }
 
     fun getUserId(
         userId: UUID,

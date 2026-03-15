@@ -296,3 +296,218 @@ data_sent.............................................: 8.9 MB 24 kB/s
 - 응답 시간(`p(95)` 32.5s)과 실패율(38.41%)이 Full Cache 단계보다 소폭 증가했는데, 이는 락 구현 방식 변경에 따른 경합 패턴 차이로 보인다.
 - 쿠폰 발행 응답 허용 성공률이 `49% → 58%` 로 올랐고, 여전히 락 경합 구간의 병목은 남아 있다.
 - `userId 일치` 체크 1건 실패는 단발성으로 보이며, 락 전환 자체의 구조적 문제로 보기 어렵다.
+
+## Redis 캐시 Jitter 적용 테스트 결과
+
+캐시 만료 시점에 Jitter를 추가해 Cache Stampede를 방지한 뒤 `issue_coupon_redis_lock_v2` 시나리오를 측정했다.
+
+### 결과 요약
+
+- `http_req_duration{phase:measure,kind:issue_coupon_redis_lock_v2}` 의 `p(95)` 는 `30.92s` 로, Redisson 전환 단계 `32.5s` 대비 소폭 개선됐다.
+- `http_req_failed{phase:measure,kind:issue_coupon_redis_lock_v2}` 실패율은 `36.09%` 로, Redisson 단계 `38.41%` 보다 낮아졌다.
+- 쿠폰 발행 응답 허용 체크 성공률은 `56%` (`18,955 / 33,504`) 였다.
+- **통계 검증 항목이 모두 통과했다.** 발급 수량이 목표 수량과 일치하고 잔여 수량도 `0` 으로 확인됐다.
+- 전체 HTTP 처리량은 `84.63 req/s`, iteration 처리량은 `13.28 it/s` 였다.
+
+### 상세 지표
+
+```text
+TOTAL RESULTS
+
+✗ 쿠폰 발행 응답 허용
+  ↳  56% — ✓ 18955 / ✗ 14549
+✓ 쿠폰 발행 성공 시 ID 존재
+✓ 쿠폰 발행 성공 시 storeId 일치
+✓ 쿠폰 발행 성공 시 userId 일치
+✓ 쿠폰 발행 성공 시 issuedAt 존재
+✓ 통계 조회 성공
+✓ 통계 응답 storeId 일치
+✓ 통계 응답 총 발급 수량 일치
+✓ 통계 응답 발급 수량이 목표 수량과 일치
+✓ 통계 응답 잔여 수량 0
+✓ 통계 응답 상위 유저 중복 발급 없음
+
+HTTP
+http_req_duration.....................................: avg=8.55s  min=0s     med=2.16s max=4m45s p(90)=28.09s p(95)=30.92s
+  { expected_response:true }..........................: avg=12.28s min=1.82ms med=5.88s max=4m44s p(90)=29.25s p(95)=33.23s
+  { phase:measure,kind:issue_coupon_redis_lock_v2 }...: avg=8.55s  min=0s     med=2.16s max=4m45s p(90)=28.09s p(95)=30.92s
+http_req_failed.......................................: 36.09% 18629 out of 51610
+  { phase:measure,kind:issue_coupon_redis_lock_v2 }...: 36.10% 18629 out of 51598
+http_reqs.............................................: 51610  84.632505/s
+
+EXECUTION
+iteration_duration....................................: avg=14.13s min=3.92ms med=8.53s max=4m43s p(90)=31.47s p(95)=32.33s
+iterations............................................: 8098   13.279481/s
+vus...................................................: 0      min=0              max=50522
+vus_max...............................................: 100000 min=14043          max=100000
+
+NETWORK
+data_received.........................................: 9.6 MB 16 kB/s
+data_sent.............................................: 10 MB  17 kB/s
+```
+
+### 해석
+
+- Jitter 적용으로 캐시 만료 집중 현상이 완화되면서 응답 시간(`p(95)` 32.5s → 30.92s)과 실패율(38.41% → 36.09%)이 소폭 개선됐다.
+- 통계 검증은 모두 통과해 최종 정합성은 유지됐다.
+- 쿠폰 발행 응답 허용 성공률은 `56%` 로 Redisson 단계 `58%` 대비 소폭 낮아졌으나, 전반적인 실패율 개선과 정합성 유지를 고려하면 Jitter 적용의 효과는 긍정적이다.
+- 락 경합 구간의 병목은 여전히 남아 있어 추가적인 개선 여지가 있다.
+## In-Flight Race Condition 분석: 쿠폰 초과 발급 (1003/1000)
+
+`withUserLock` 제거 후 테스트에서 쿠폰이 1000개 제한인데 1003개가 발급되는 데이터 정합성 버그가 발생했다.
+원인은 **Redis stock key eviction + in-flight 트랜잭션의 DB 미반영**이 결합된 race condition이다.
+
+### 정상 흐름
+
+정상적인 쿠폰 발급 흐름에서는 Redis stock이 재고를 원자적으로 관리한다.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Service as CouponRedisLockV2Service
+    participant Redis as Redis (stock key)
+    participant DB as PostgreSQL
+
+    Note over Redis: stock = 3, DB = 997
+
+    Client->>Service: 쿠폰 발급 요청
+    Service->>Redis: decreaseRemainingStock()
+    Redis-->>Service: CAS 성공 (3→2)
+    Service->>DB: verifyUserAndCheckDuplicateCoupon()
+    DB-->>Service: 중복 아님
+    Service->>DB: couponRepository.save()
+    DB-->>Service: 저장 완료 (DB = 998)
+    Service->>Redis: markCouponIssued()
+
+    Note over Redis: stock = 2, DB = 998 ✅ 정합성 유지
+```
+
+### 버그 시나리오: Stock Key Eviction + In-Flight 트랜잭션
+
+핵심은 `initializeRemainingStockIfAbsent`가 DB의 `countByStoreId`로 재고를 재초기화할 때,
+**아직 커밋되지 않은 in-flight 트랜잭션을 반영하지 못한다**는 것이다.
+
+```mermaid
+sequenceDiagram
+    participant A as Thread A
+    participant B as Thread B
+    participant C as Thread C
+    participant D as Thread D (재초기화)
+    participant Redis as Redis
+    participant DB as PostgreSQL
+
+    Note over Redis,DB: 초기 상태: DB = 997 (committed), stock = 3
+
+    rect rgb(200, 230, 255)
+    Note right of A: Phase 1: 정상 stock 감소
+    A->>Redis: decreaseRemainingStock() → 3→2 ✅
+    B->>Redis: decreaseRemainingStock() → 2→1 ✅
+    C->>Redis: decreaseRemainingStock() → 1→0 ✅
+    end
+
+    Note over Redis: stock = 0, 하지만 A,B,C는 아직 DB에 커밋하지 않음
+
+    rect rgb(255, 200, 200)
+    Note right of Redis: ⚡ Redis 메모리 압박으로 stock key eviction 발생
+    Redis--xRedis: stock key 삭제됨
+    end
+
+    rect rgb(255, 255, 200)
+    Note right of D: Phase 2: 재초기화 (stale read)
+    D->>Redis: initializeRemainingStockIfAbsent()
+    D->>Redis: stock.isExists? → false (eviction됨)
+    D->>Redis: loadWithShortLock() → lock 획득
+    D->>DB: countByStoreId() → 997 (A,B,C 미커밋!)
+    D->>Redis: stock.set(1000 - 997) = 3
+    Note over Redis: stock = 3 ← ⚠️ 이미 3개가 in-flight인데 다시 3으로 초기화
+    end
+
+    rect rgb(200, 230, 255)
+    Note right of A: Phase 3: 기존 in-flight 커밋
+    A->>DB: save() → DB = 998
+    B->>DB: save() → DB = 999
+    C->>DB: save() → DB = 1000
+    end
+
+    rect rgb(255, 200, 200)
+    Note right of D: Phase 4: 초과 발급 발생
+    D->>Redis: decreaseRemainingStock() → 3→2 ✅
+    D->>DB: save() → DB = 1001 ❌
+    Note over D: 이후 2개 더 발급 가능 → 최종 DB = 1003
+    end
+```
+
+### 왜 이런 일이 발생하는가?
+
+문제의 근본 원인은 **두 가지 시스템 간의 일관성 단절**이다.
+
+```mermaid
+flowchart TD
+    subgraph 정합성_유지_조건
+        A[Redis stock 감소] -->|원자적| B[DB INSERT 커밋]
+        B --> C[stock + issued = eventTotalCount]
+    end
+
+    subgraph 버그_발생_조건
+        D[Redis stock key eviction] --> E[재초기화 시 DB COUNT 조회]
+        E --> F["READ COMMITTED: 미커밋 트랜잭션 제외"]
+        F --> G["stock = eventTotalCount - committed_count"]
+        G --> H["in-flight 수만큼 초과 발급 허용"]
+    end
+
+    style D fill:#ff9999
+    style F fill:#ff9999
+    style H fill:#ff9999
+```
+
+### 원인 코드 분석
+
+`CouponRedisCoordinator.kt`의 `initializeRemainingStockIfAbsent`:
+
+```kotlin
+private fun initializeRemainingStockIfAbsent(storeId, eventTotalCount, issuedCountLoader) {
+    val stock = redissonClient.getAtomicLong(stockKey(storeId))
+    loadWithShortLock(
+        lockKey = stockInitializationLockKey(storeId),
+        readCached = { if (stock.isExists) true else null },  // key가 eviction되면 false
+        loadAndCache = {
+            val issuedCount = issuedCountLoader()             // ← READ COMMITTED만 반영
+            stock.set((eventTotalCount - issuedCount).coerceAtLeast(0L))  // ← stale count로 초기화
+            true
+        },
+    )
+}
+```
+
+| 취약점 | 설명 |
+|--------|------|
+| `stock key에 TTL 없음` | Redis 메모리 압박 시 LRU eviction 대상이 됨 |
+| `issuedCountLoader`가 READ COMMITTED | 아직 커밋되지 않은 in-flight 트랜잭션의 쿠폰을 세지 못함 |
+| `stock 감소 ↔ DB 커밋 사이의 gap` | 이 구간에서 재초기화가 발생하면 stock이 실제보다 높게 설정됨 |
+
+### 발생 조건 정리
+
+이 버그가 발생하려면 **세 가지 조건이 동시에 충족**되어야 한다.
+
+```mermaid
+flowchart LR
+    A["1️⃣ Redis stock key<br/>eviction/삭제"] --> D{세 조건<br/>동시 충족?}
+    B["2️⃣ In-flight 트랜잭션<br/>존재 (stock ↓, DB 미커밋)"] --> D
+    C["3️⃣ 재초기화 시점에<br/>DB COUNT 조회"] --> D
+    D -->|Yes| E["🔴 초과 발급"]
+    D -->|No| F["✅ 정합성 유지"]
+
+    style E fill:#ff6666,color:#fff
+    style F fill:#66cc66,color:#fff
+```
+
+### 참고: 초과 발급 수량 공식
+
+초과 발급 수량은 **재초기화 시점의 in-flight 트랜잭션 수**와 정확히 일치한다.
+
+```
+초과_발급_수 = 재초기화_시점_in_flight_count
+실제_발급_수 = eventTotalCount + in_flight_count
+```
+
+이번 케이스에서 `1003 - 1000 = 3`, 즉 재초기화 시점에 3개의 트랜잭션이 in-flight 상태였다.

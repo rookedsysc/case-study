@@ -16,11 +16,13 @@ class RedissonConfig(
 ) {
     @Bean(destroyMethod = "shutdown")
     fun redissonClient(): RedissonClient {
-        // 1 core / 1 GB 환경 기준 적정 설정 (Redisson 기본값: threads=16, nettyThreads=32, pool=64, idle=24)
+        // 0으로 설정하면 CPU 코어 수 기반 자동 설정 (기본값: threads=16, nettyThreads=32)
+        // ref: https://github.com/redisson/redisson/wiki/2.-Configuration
+        // ref: https://github.com/redisson/redisson/issues/5317
         val config =
             Config().apply {
-                threads = 4
-                nettyThreads = 4
+                threads = 0
+                nettyThreads = 0
                 useSingleServer()
                     .setAddress("redis://$host:$port")
                     .setPassword(password)

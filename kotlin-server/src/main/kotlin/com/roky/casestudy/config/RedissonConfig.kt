@@ -18,9 +18,13 @@ class RedissonConfig(
     fun redissonClient(): RedissonClient {
         val config =
             Config().apply {
+                threads = 4
+                nettyThreads = 4
                 useSingleServer()
                     .setAddress("redis://$host:$port")
                     .setPassword(password)
+                    .setConnectionPoolSize(16)
+                    .setConnectionMinimumIdleSize(4)
             }
         return Redisson.create(config)
     }

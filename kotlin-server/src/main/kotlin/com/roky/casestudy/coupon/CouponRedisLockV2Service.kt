@@ -63,6 +63,7 @@ class CouponRedisLockV2Service(
                         user = appUserRepository.getReferenceById(userId),
                     ),
                 )
+            stockDecreased = false
             couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
             return CouponMapper.toResponse(coupon)
         } catch (e: DataIntegrityViolationException) {

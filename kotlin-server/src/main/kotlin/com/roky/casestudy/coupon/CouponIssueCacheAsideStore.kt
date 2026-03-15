@@ -30,10 +30,10 @@ class CouponIssueCacheAsideStore(
             },
         )
 
-    fun getUserId(
+    fun verifyUserExistsWithCache(
         userId: UUID,
         loader: () -> AppUserEntity,
-    ): UUID =
+    ) {
         couponRedisCoordinator.loadWithShortLock(
             lockKey = couponRedisCoordinator.userLoadLockKey(userId),
             readCached = { redisTemplate.opsForValue().get(userCacheKey(userId))?.let { userId } },
@@ -43,6 +43,7 @@ class CouponIssueCacheAsideStore(
                 user.id
             },
         )
+    }
 
     fun hasIssuedCoupon(
         storeId: UUID,

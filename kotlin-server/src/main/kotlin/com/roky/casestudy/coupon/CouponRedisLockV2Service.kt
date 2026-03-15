@@ -20,7 +20,6 @@ class CouponRedisLockV2Service(
     private val appUserRepository: AppUserRepository,
 ) {
     /** Redis 락과 cache-aside 기반으로 쿠폰을 발행합니다. */
-    @Transactional
     fun issueCoupon(request: IssueCouponRequest): CouponResponse {
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
@@ -45,7 +44,7 @@ class CouponRedisLockV2Service(
             }
 
             return couponRedisCoordinator.withUserLock(userId) {
-                couponIssueCacheAsideStore.getUserId(userId) {
+                couponIssueCacheAsideStore.verifyUserExistsWithCache(userId) {
                     appUserRepository
                         .findById(userId)
                         .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }

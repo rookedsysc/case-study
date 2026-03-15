@@ -3,14 +3,23 @@ spring:
     name: case-study
 
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:casestudy}
-    username: ${MYSQL_USER:appuser}
-    password: ${MYSQL_PASSWORD:apppassword}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      # 인스턴스 3개 기준 총 60 connection (MySQL default max_connections: 151 이하로 유지)
-      maximum-pool-size: 20
-      minimum-idle: 10
+    write:
+      jdbc-url: jdbc:mysql://${MYSQL_WRITE_HOST:localhost}:${MYSQL_WRITE_PORT:6033}/${MYSQL_DATABASE:casestudy}
+      username: ${MYSQL_USER:appuser}
+      password: ${MYSQL_PASSWORD:apppassword}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+    read:
+      jdbc-url: jdbc:mysql://${MYSQL_READ_HOST:localhost}:${MYSQL_READ_PORT:6033}/${MYSQL_DATABASE:casestudy}
+      username: ${MYSQL_USER:appuser}
+      password: ${MYSQL_PASSWORD:apppassword}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      maximum-pool-size: 15
+      minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -30,6 +39,9 @@ spring:
 
   flyway:
     enabled: true
+    url: jdbc:mysql://${FLYWAY_HOST:localhost}:${FLYWAY_PORT:3306}/${MYSQL_DATABASE:casestudy}
+    user: ${MYSQL_USER:appuser}
+    password: ${MYSQL_PASSWORD:apppassword}
     locations: classpath:db/migration
 
   data:

@@ -1,20 +1,122 @@
 {
   "title": "MySQL Metrics",
   "uid": "mysql-metrics",
-  "tags": ["mysql", "database"],
+  "tags": ["mysql", "database", "replication"],
   "timezone": "browser",
   "refresh": "5s",
   "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "role",
+        "type": "custom",
+        "current": { "text": "All", "value": "$__all" },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": true },
+          { "text": "source", "value": "source", "selected": false },
+          { "text": "replica", "value": "replica", "selected": false }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "query": "source,replica"
+      }
+    ]
+  },
   "panels": [
     {
-      "id": 1,
-      "title": "Slow Query 빈도",
+      "id": 100,
+      "title": "Replication Lag (Seconds Behind Source)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "rate(mysql_global_status_slow_queries[5m])",
-          "legendFormat": "Slow Queries/s"
+          "expr": "mysql_slave_status_seconds_behind_master{role=\"replica\"}",
+          "legendFormat": "Seconds Behind Source"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 101,
+      "title": "Replication Thread 상태",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "mysql_slave_status_slave_io_running{role=\"replica\"}",
+          "legendFormat": "IO Thread Running"
+        },
+        {
+          "expr": "mysql_slave_status_slave_sql_running{role=\"replica\"}",
+          "legendFormat": "SQL Thread Running"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "Running", "color": "green" }, "0": { "text": "Stopped", "color": "red" } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": 102,
+      "title": "Semi-Sync Replication 상태",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "mysql_global_status_rpl_semi_sync_source_yes_tx{role=\"source\"}",
+          "legendFormat": "Semi-Sync Yes Tx (Source)"
+        },
+        {
+          "expr": "mysql_global_status_rpl_semi_sync_source_no_tx{role=\"source\"}",
+          "legendFormat": "Semi-Sync No Tx (Source)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "id": 103,
+      "title": "Source/Replica QPS 비교",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_queries{role=\"source\"}[5m])",
+          "legendFormat": "Source Queries/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_queries{role=\"replica\"}[5m])",
+          "legendFormat": "Replica Queries/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 1,
+      "title": "Slow Query 빈도",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_slow_queries{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Slow Queries/s"
         }
       ],
       "fieldConfig": {
@@ -32,21 +134,13 @@
     },
     {
       "id": 2,
-      "title": "연결 수",
+      "title": "Slow Query 누적",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "targets": [
         {
-          "expr": "mysql_global_status_threads_connected",
-          "legendFormat": "Connected"
-        },
-        {
-          "expr": "mysql_global_variables_max_connections",
-          "legendFormat": "Max Connections"
-        },
-        {
-          "expr": "mysql_global_status_threads_running",
-          "legendFormat": "Running"
+          "expr": "mysql_global_status_slow_queries{role=~\"$role\"}",
+          "legendFormat": "{{role}} Slow Queries Total"
         }
       ],
       "fieldConfig": {
@@ -55,13 +149,246 @@
     },
     {
       "id": 3,
-      "title": "InnoDB 버퍼 풀 히트율",
+      "title": "연결 수",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "targets": [
         {
-          "expr": "(1 - rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m])) * 100",
-          "legendFormat": "Buffer Pool Hit Rate %"
+          "expr": "mysql_global_status_threads_connected{role=~\"$role\"}",
+          "legendFormat": "{{role}} Connected"
+        },
+        {
+          "expr": "mysql_global_variables_max_connections{role=~\"$role\"}",
+          "legendFormat": "{{role}} Max Connections"
+        },
+        {
+          "expr": "mysql_global_status_threads_running{role=~\"$role\"}",
+          "legendFormat": "{{role}} Running"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "id": 4,
+      "title": "쿼리 처리량 (QPS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_queries{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Queries/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_questions{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Questions/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 5,
+      "title": "DML 처리량 분류",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum by (command, role) (rate(mysql_global_status_commands_total{command=~\"select|insert|update|delete\", role=~\"$role\"}[5m]))",
+          "legendFormat": "{{role}} {{command}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 6,
+      "title": "상위 쿼리 Digest 실행 빈도",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "expr": "topk(5, rate(mysql_perf_schema_events_statements_total{role=~\"$role\"}[5m]))",
+          "legendFormat": "{{role}} {{schema}} {{digest_text}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 7,
+      "title": "상위 쿼리 Digest 평균 지연",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "topk(5, rate(mysql_perf_schema_events_statements_seconds_total{role=~\"$role\"}[5m]) / clamp_min(rate(mysql_perf_schema_events_statements_total{role=~\"$role\"}[5m]), 0.001))",
+          "legendFormat": "{{role}} {{schema}} {{digest_text}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "id": 8,
+      "title": "테이블 락 대기 시간",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "targets": [
+        {
+          "expr": "sum by (operation, role) (rate(mysql_perf_schema_sql_lock_waits_seconds_total{role=~\"$role\"}[5m]))",
+          "legendFormat": "{{role}} SQL {{operation}}"
+        },
+        {
+          "expr": "sum by (operation, role) (rate(mysql_perf_schema_external_lock_waits_seconds_total{role=~\"$role\"}[5m]))",
+          "legendFormat": "{{role}} External {{operation}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "id": 9,
+      "title": "테이블 I/O 대기 시간",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "expr": "sum by (operation, role) (rate(mysql_perf_schema_table_io_waits_seconds_total{role=~\"$role\"}[5m]))",
+          "legendFormat": "{{role}} {{operation}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "id": 10,
+      "title": "임시 테이블 생성",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_created_tmp_tables{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Memory Tmp Tables/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_created_tmp_disk_tables{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Disk Tmp Tables/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 11,
+      "title": "테이블 스캔 비율",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_select_full_join{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Full Join/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_select_scan{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Full Table Scan/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 12,
+      "title": "InnoDB 행 작업",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"read\", role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Row Reads/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"inserted\", role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Row Inserts/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"updated\", role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Row Updates/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"deleted\", role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Row Deletes/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 13,
+      "title": "연결 실패 및 중단",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_aborted_connects{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Aborted Connects/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_aborted_clients{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Aborted Clients/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 14,
+      "title": "가용성 및 연결 포화도",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+      "targets": [
+        {
+          "expr": "up{job=\"mysqld-exporter\"} * 100",
+          "legendFormat": "{{role}} Exporter Up %"
+        },
+        {
+          "expr": "mysql_global_status_threads_running{role=~\"$role\"} / mysql_global_variables_max_connections{role=~\"$role\"} * 100",
+          "legendFormat": "{{role}} Threads Running / Max Connections %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 15,
+      "title": "InnoDB 버퍼 풀 히트율",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 72 },
+      "targets": [
+        {
+          "expr": "(1 - rate(mysql_global_status_innodb_buffer_pool_reads{role=~\"$role\"}[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests{role=~\"$role\"}[5m])) * 100",
+          "legendFormat": "{{role}} Buffer Pool Hit Rate %"
         }
       ],
       "fieldConfig": {
@@ -76,73 +403,8 @@
           }
         }
       }
-    },
-    {
-      "id": 4,
-      "title": "쿼리 처리량 (QPS)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "targets": [
-        {
-          "expr": "rate(mysql_global_status_queries[5m])",
-          "legendFormat": "Queries/s"
-        },
-        {
-          "expr": "rate(mysql_global_status_questions[5m])",
-          "legendFormat": "Questions/s"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "ops" }
-      }
-    },
-    {
-      "id": 5,
-      "title": "테이블 스캔 비율",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
-      "targets": [
-        {
-          "expr": "rate(mysql_global_status_select_full_join[5m])",
-          "legendFormat": "Full Join/s"
-        },
-        {
-          "expr": "rate(mysql_global_status_select_scan[5m])",
-          "legendFormat": "Full Table Scan/s"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "ops" }
-      }
-    },
-    {
-      "id": 6,
-      "title": "InnoDB 행 작업",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
-      "targets": [
-        {
-          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[5m])",
-          "legendFormat": "Row Reads/s"
-        },
-        {
-          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"inserted\"}[5m])",
-          "legendFormat": "Row Inserts/s"
-        },
-        {
-          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"updated\"}[5m])",
-          "legendFormat": "Row Updates/s"
-        },
-        {
-          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"deleted\"}[5m])",
-          "legendFormat": "Row Deletes/s"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "ops" }
-      }
     }
   ],
   "schemaVersion": 38,
-  "version": 1
+  "version": 4
 }

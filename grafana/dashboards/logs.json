@@ -10,7 +10,7 @@
       "id": 1,
       "title": "로그 볼륨",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
@@ -24,9 +24,49 @@
     },
     {
       "id": 2,
+      "title": "에러 로그 비율",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(rate({service_name=~\".+\"} |~ \"(?i)(error|exception|fail)\" [5m]))",
+          "legendFormat": "error logs/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 3,
+      "title": "로그 무수집 탐지",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "absent_over_time({service_name=~\".+\"}[5m])",
+          "legendFormat": "absent"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
       "title": "ERROR 로그",
       "type": "logs",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 6 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 12 },
       "options": {
         "showTime": true,
         "showLabels": true,
@@ -37,16 +77,16 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service_name=~\".+\"} | detected_level = `error`",
+          "expr": "{service_name=~\".+\"} |~ \"(?i)(error|exception|fail)\"",
           "legendFormat": ""
         }
       ]
     },
     {
-      "id": 3,
+      "id": 5,
       "title": "전체 로그",
       "type": "logs",
-      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 18 },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 24 },
       "options": {
         "showTime": true,
         "showLabels": true,
@@ -64,5 +104,5 @@
     }
   ],
   "schemaVersion": 38,
-  "version": 1
+  "version": 2
 }

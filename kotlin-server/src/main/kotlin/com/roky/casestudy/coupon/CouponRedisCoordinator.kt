@@ -104,6 +104,8 @@ class CouponRedisCoordinator(
 
     fun stockInitializationLockKey(storeId: UUID): String = "coupon:lock:stock-init:$storeId"
 
+    fun userLoadLockKey(userId: UUID): String = "coupon:lock:user-load:$userId"
+
     private fun userLockKey(userId: UUID): String = "coupon:lock:user:$userId"
 
     private fun stockKey(storeId: UUID): String = "coupon:stock:remaining:$storeId"

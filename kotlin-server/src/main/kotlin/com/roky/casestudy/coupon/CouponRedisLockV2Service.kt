@@ -2,6 +2,7 @@ package com.roky.casestudy.coupon
 
 import com.roky.casestudy.coupon.dto.CouponResponse
 import com.roky.casestudy.coupon.dto.IssueCouponRequest
+import com.roky.casestudy.coupon.exception.CouponIssueInProgressException
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import com.roky.casestudy.store.StoreRepository
@@ -75,6 +76,11 @@ class CouponRedisLockV2Service(
             if (e.mostSpecificCause.message?.contains(COUPON_UNIQUE_CONSTRAINT_NAME) == true) {
                 couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
                 throw DuplicateCouponException(storeId, userId)
+            }
+            throw e
+        } catch (e: CouponIssueInProgressException) {
+            if (stockDecreased) {
+                couponRedisCoordinator.rollbackStock(storeId)
             }
             throw e
         } catch (e: RuntimeException) {

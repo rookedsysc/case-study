@@ -33,16 +33,16 @@ class CouponIssueCacheAsideStore(
     fun getUserId(
         userId: UUID,
         loader: () -> AppUserEntity,
-    ): UUID {
-        val cachedUser = redisTemplate.opsForValue().get(userCacheKey(userId))
-        if (cachedUser != null) {
-            return userId
-        }
-
-        val user = loader()
-        redisTemplate.opsForValue().set(userCacheKey(userId), PRESENT_CACHE_VALUE, cacheTtlWithJitter())
-        return user.id
-    }
+    ): UUID =
+        couponRedisCoordinator.loadWithShortLock(
+            lockKey = couponRedisCoordinator.userLoadLockKey(userId),
+            readCached = { redisTemplate.opsForValue().get(userCacheKey(userId))?.let { userId } },
+            loadAndCache = {
+                val user = loader()
+                redisTemplate.opsForValue().set(userCacheKey(userId), PRESENT_CACHE_VALUE, cacheTtlWithJitter())
+                user.id
+            },
+        )
 
     fun hasIssuedCoupon(
         storeId: UUID,

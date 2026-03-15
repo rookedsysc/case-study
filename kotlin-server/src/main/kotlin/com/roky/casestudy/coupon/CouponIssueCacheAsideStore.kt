@@ -70,7 +70,7 @@ class CouponIssueCacheAsideStore(
         redisTemplate.opsForValue().set(couponIssuedCacheKey(storeId, userId), ISSUED_CACHE_VALUE, cacheTtlWithJitter())
     }
 
-    private fun cacheTtlWithJitter(): Duration = Duration.ofSeconds(ThreadLocalRandom.current().nextLong(60, 131))
+    private fun cacheTtlWithJitter(): Duration = Duration.ofSeconds(ThreadLocalRandom.current().nextLong(600, 661))
 
     private fun readStoreSnapshot(storeId: UUID): CachedStoreSnapshot? {
         val cachedEventTotalCount = redisTemplate.opsForValue().get(storeCacheKey(storeId)) ?: return null

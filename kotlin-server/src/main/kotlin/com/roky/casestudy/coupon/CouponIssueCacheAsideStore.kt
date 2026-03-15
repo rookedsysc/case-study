@@ -4,6 +4,7 @@ import com.roky.casestudy.store.StoreEntity
 import com.roky.casestudy.user.AppUserEntity
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
@@ -62,6 +63,18 @@ class CouponIssueCacheAsideStore(
             cacheTtlWithJitter(),
         )
         return issued
+    }
+
+    /** 유저 존재 여부와 쿠폰 중복 발급 여부를 단일 읽기 트랜잭션으로 검증합니다. */
+    @Transactional(readOnly = true)
+    fun verifyUserAndCheckDuplicateCoupon(
+        storeId: UUID,
+        userId: UUID,
+        userLoader: () -> AppUserEntity,
+        issuedLoader: () -> Boolean,
+    ): Boolean {
+        verifyUserExistsWithCache(userId, userLoader)
+        return hasIssuedCoupon(storeId, userId, issuedLoader)
     }
 
     fun markCouponIssued(

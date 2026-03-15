@@ -2,14 +2,12 @@ package com.roky.casestudy.coupon
 
 import com.roky.casestudy.coupon.dto.CouponResponse
 import com.roky.casestudy.coupon.dto.IssueCouponRequest
-import com.roky.casestudy.coupon.exception.CouponIssueInProgressException
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import com.roky.casestudy.store.StoreRepository
 import com.roky.casestudy.user.AppUserRepository
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class CouponRedisLockV2Service(
@@ -43,31 +41,30 @@ class CouponRedisLockV2Service(
                 throw CouponLimitExceededException(storeId)
             }
 
-            return couponRedisCoordinator.withUserLock(userId) {
-                couponIssueCacheAsideStore.verifyUserExistsWithCache(userId) {
-                    appUserRepository
-                        .findById(userId)
-                        .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
-                }
-
-                if (
-                    couponIssueCacheAsideStore.hasIssuedCoupon(storeId, userId) {
-                        couponRepository.existsByStoreIdAndUserId(storeId, userId)
-                    }
-                ) {
-                    throw DuplicateCouponException(storeId, userId)
-                }
-
-                val coupon =
-                    couponRepository.saveAndFlush(
-                        CouponEntity(
-                            store = storeRepository.getReferenceById(storeId),
-                            user = appUserRepository.getReferenceById(userId),
-                        ),
-                    )
-                couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
-                CouponMapper.toResponse(coupon)
+            val isDuplicate =
+                couponIssueCacheAsideStore.verifyUserAndCheckDuplicateCoupon(
+                    storeId = storeId,
+                    userId = userId,
+                    userLoader = {
+                        appUserRepository
+                            .findById(userId)
+                            .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
+                    },
+                    issuedLoader = { couponRepository.existsByStoreIdAndUserId(storeId, userId) },
+                )
+            if (isDuplicate) {
+                throw DuplicateCouponException(storeId, userId)
             }
+
+            val coupon =
+                couponRepository.save(
+                    CouponEntity(
+                        store = storeRepository.getReferenceById(storeId),
+                        user = appUserRepository.getReferenceById(userId),
+                    ),
+                )
+            couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
+            return CouponMapper.toResponse(coupon)
         } catch (e: DataIntegrityViolationException) {
             if (stockDecreased) {
                 couponRedisCoordinator.rollbackStock(storeId)
@@ -75,11 +72,6 @@ class CouponRedisLockV2Service(
             if (e.mostSpecificCause.message?.contains(COUPON_UNIQUE_CONSTRAINT_NAME) == true) {
                 couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
                 throw DuplicateCouponException(storeId, userId)
-            }
-            throw e
-        } catch (e: CouponIssueInProgressException) {
-            if (stockDecreased) {
-                couponRedisCoordinator.rollbackStock(storeId)
             }
             throw e
         } catch (e: RuntimeException) {

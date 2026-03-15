@@ -9,7 +9,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -35,6 +35,12 @@ services:
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
       - OTEL_LOGS_EXPORTER=otlp
       - OTEL_SERVICE_NAME=case-study
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
     depends_on:
       mysql:
         condition: service_healthy

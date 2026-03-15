@@ -11,19 +11,6 @@ class StoreService(
     private val storeRepository: StoreRepository,
 ) {
     /**
-     * 상점을 ID로 조회합니다.
-     *
-     * @throws NoSuchElementException 상점이 존재하지 않는 경우
-     */
-    fun getStore(id: UUID): StoreResponse {
-        val store =
-            storeRepository
-                .findById(id)
-                .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $id") }
-        return StoreMapper.toResponse(store)
-    }
-
-    /**
      * 상점을 count개 일괄 생성하고 생성된 ID 목록을 반환합니다.
      * 부하 테스트 사전 데이터 생성 용도로 사용됩니다.
      *

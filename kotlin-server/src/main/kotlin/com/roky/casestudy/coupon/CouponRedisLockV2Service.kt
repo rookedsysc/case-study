@@ -23,6 +23,7 @@ class CouponRedisLockV2Service(
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
         var shouldRollbackStock = false
+        var hasError = true
 
         try {
             val store =
@@ -58,21 +59,19 @@ class CouponRedisLockV2Service(
             }
 
             val coupon = couponCommandService.saveAndMarkIssued(storeId, userId)
-            return CouponMapper.toResponse(coupon)
+            val response = CouponMapper.toResponse(coupon)
+            hasError = false
+            return response
         } catch (e: DataIntegrityViolationException) {
-            if (shouldRollbackStock) {
-                couponRedisCoordinator.rollbackStock(storeId)
-            }
             if (e.mostSpecificCause.message?.contains(COUPON_UNIQUE_CONSTRAINT_NAME) == true) {
                 couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
                 throw DuplicateCouponException(storeId, userId)
             }
             throw e
-        } catch (e: Exception) {
-            if (shouldRollbackStock) {
+        } finally {
+            if (hasError && shouldRollbackStock) {
                 couponRedisCoordinator.rollbackStock(storeId)
             }
-            throw e
         }
     }
 

@@ -2,7 +2,9 @@ package com.roky.casestudy.coupon
 
 import com.roky.casestudy.coupon.exception.CouponCacheLoadLockTimeoutException
 import com.roky.casestudy.coupon.exception.CouponIssueInProgressException
+import org.redisson.api.RScript
 import org.redisson.api.RedissonClient
+import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.UUID
@@ -12,6 +14,8 @@ import java.util.concurrent.TimeUnit
 class CouponRedisCoordinator(
     private val redissonClient: RedissonClient,
 ) {
+    private val decreaseStockScript: String =
+        ClassPathResource("scripts/decrease-stock.lua").inputStream.bufferedReader().readText()
     private val cacheLoadLockWaitTimeout = Duration.ofMillis(300)
     private val cacheLoadLockTtl = Duration.ofSeconds(2)
     private val userLockWaitTimeout = Duration.ofSeconds(2)
@@ -80,20 +84,20 @@ class CouponRedisCoordinator(
         }
     }
 
-    /** RAtomicLong CAS 루프로 재고를 원자적으로 감소시킵니다. 재고가 0이면 false를 반환합니다. */
+    /** Lua 스크립트로 재고를 원자적으로 감소시킵니다. 재고가 0이면 false를 반환합니다. */
     fun decreaseRemainingStock(
         storeId: UUID,
         eventTotalCount: Long,
         issuedCountLoader: () -> Long,
     ): Boolean {
         initializeRemainingStockIfAbsent(storeId, eventTotalCount, issuedCountLoader)
-        val stock = redissonClient.getAtomicLong(stockKey(storeId))
-        var current = stock.get()
-        while (current > 0) {
-            if (stock.compareAndSet(current, current - 1)) return true
-            current = stock.get()
-        }
-        return false
+        val result = redissonClient.script.eval<Long>(
+            RScript.Mode.READ_WRITE,
+            decreaseStockScript,
+            RScript.ReturnType.INTEGER,
+            listOf(stockKey(storeId)),
+        )
+        return result == 1L
     }
 
     fun rollbackStock(storeId: UUID) {

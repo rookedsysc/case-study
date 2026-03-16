@@ -3,6 +3,7 @@ spring:
     name: case-study
 
   datasource:
+    source-only: ${MYSQL_SOURCE_ONLY:false}
     write:
       jdbc-url: jdbc:mysql://${MYSQL_WRITE_HOST:localhost}:${MYSQL_WRITE_PORT:6033}/${MYSQL_DATABASE:casestudy}
       username: ${MYSQL_USER:appuser}

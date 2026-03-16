@@ -33,6 +33,7 @@ services:
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
       - FLYWAY_HOST=mysql-source
       - FLYWAY_PORT=3306
+      - MYSQL_SOURCE_ONLY=${MYSQL_SOURCE_ONLY:-false}
       - REDIS_HOST=redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}

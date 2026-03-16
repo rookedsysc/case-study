@@ -18,6 +18,9 @@ mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
         GET_SOURCE_PUBLIC_KEY=1;
 
     START REPLICA;
+
+    SET GLOBAL read_only = ON;
+    SET GLOBAL super_read_only = ON;
 EOSQL
 
-echo "Replication started successfully"
+echo "Replication started successfully (read_only enabled)"

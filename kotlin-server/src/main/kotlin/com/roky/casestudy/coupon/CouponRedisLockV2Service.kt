@@ -8,6 +8,7 @@ import com.roky.casestudy.store.StoreRepository
 import com.roky.casestudy.user.AppUserRepository
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class CouponRedisLockV2Service(
@@ -18,6 +19,7 @@ class CouponRedisLockV2Service(
     private val appUserRepository: AppUserRepository,
 ) {
     /** Redis 락과 cache-aside 기반으로 쿠폰을 발행합니다. */
+    @Transactional
     fun issueCoupon(request: IssueCouponRequest): CouponResponse {
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
@@ -63,7 +65,6 @@ class CouponRedisLockV2Service(
                         user = appUserRepository.getReferenceById(userId),
                     ),
                 )
-            shouldRollbackStock = false
             couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
             return CouponMapper.toResponse(coupon)
         } catch (e: DataIntegrityViolationException) {

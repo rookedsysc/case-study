@@ -7,10 +7,16 @@
   - 쿠폰 발행량 : 1000개
   - 인당 발행 제한 : 1개
   - 인당 발행 시도 횟수 : 10회
-  - 목표 QPS : 5분에 10000 * 10
+  - 목표 응답 시간 : 500ms
+  - 목표 QPS : 10000명 * 10회 = 100000 req/s
+
+[비관적락 테스트](#비관적-락-테스트-결과)를 진행했을 때 목표 QPS에 어림도 없는 결과가 나와서 이를 해결하기 위해서 Redis 락을 도입했다. 동일 유저 중복 조회 방지, Coupon 개수 정합성, 상점 이벤트 정보와 유저 정보 등을 Cache Aside 했음에도 목표 QPS 달성에는 실패했다. 
+
+심지어 Redisson에서 Netty Connection Pool이 고갈되는 현상까지 발생해서 쿠폰 정합성이 맞지 않는 버그도 함께 발생했다. 쿠폰 정합성이 맞지 않는 원인은 CouponRepository.save() 로직에 transaction을 걸지 않았는데 이후 Redis에 해당 유저가 쿠폰을 발급 받았음을 기록하는 시점에 Error가 터지면서 Fallback 로직을 타 CouponRepository.save()는 성공했으나 Redis에 발급 기록이 안되는 문제가 발생했다. 따라서 [문제를 근본적으로 해결하면서 Redisson 최적화를 시도](https://github.com/rookedsysc/case-study/pull/10/changes)했다.
 
 ## 비관적 락 테스트 결과
 
+당연히 비관적 락으로는 목표 QPS를 달성할 수 없을 것으로 예상되지만 이를 점진적으로 개선해보기 위해서 비관적락을 사용하는 시나리오로 코드를 작성했다. 
 `coupon-only-load.js` 기준으로 쿠폰 발행 API의 `issue_coupon_pessimistic_lock` 시나리오를 측정했다.
 
 ### 결과 요약
@@ -24,14 +30,6 @@
 ### 상세 지표
 
 ```text
-THRESHOLDS
-
-http_req_duration{phase:measure,kind:issue_coupon_pessimistic_lock}
-✗ 'p(95) < 500' p(95)=50.47s
-
-http_req_failed{phase:measure,kind:issue_coupon_pessimistic_lock}
-✗ 'rate < 0.01' rate=72.77%
-
 TOTAL RESULTS
 
 checks_total.......: 244074 538.794638/s

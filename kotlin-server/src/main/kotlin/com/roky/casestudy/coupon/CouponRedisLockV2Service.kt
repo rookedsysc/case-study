@@ -68,7 +68,7 @@ class CouponRedisLockV2Service(
                 throw DuplicateCouponException(storeId, userId)
             }
             throw e
-        } catch (e: RuntimeException) {
+        } catch (e: Exception) {
             if (shouldRollbackStock) {
                 couponRedisCoordinator.rollbackStock(storeId)
             }

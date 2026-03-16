@@ -1,0 +1,182 @@
+{
+  "title": "MySQL Client Questions",
+  "uid": "mysql-client-questions",
+  "tags": ["mysql", "database", "questions", "client"],
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "role",
+        "type": "custom",
+        "current": { "text": "All", "value": "$__all" },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": true },
+          { "text": "source", "value": "source", "selected": false },
+          { "text": "replica", "value": "replica", "selected": false }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "query": "source,replica"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Source/Replica Client Questions 비교",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_questions{role=\"source\"}[5m])",
+          "legendFormat": "Source Questions/s"
+        },
+        {
+          "expr": "rate(mysql_global_status_questions{role=\"replica\"}[5m])",
+          "legendFormat": "Replica Questions/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Queries - Questions 차이",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_queries{role=~\"$role\"}[5m]) - rate(mysql_global_status_questions{role=~\"$role\"}[5m])",
+          "legendFormat": "{{role}} Queries-Questions/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Questions / Queries 비율",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "clamp_max(rate(mysql_global_status_questions{role=~\"$role\"}[5m]) / clamp_min(rate(mysql_global_status_queries{role=~\"$role\"}[5m]), 0.001), 1)",
+          "legendFormat": "{{role}} Questions/Queries"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.9 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "연결 수와 실행 중 스레드",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "mysql_global_status_threads_connected{role=~\"$role\"}",
+          "legendFormat": "{{role}} Connected"
+        },
+        {
+          "expr": "mysql_global_status_threads_running{role=~\"$role\"}",
+          "legendFormat": "{{role}} Running"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Replica Questions 비중",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_questions{role=\"replica\"}[5m]) / clamp_min(rate(mysql_global_status_questions{role=\"source\"}[5m]) + rate(mysql_global_status_questions{role=\"replica\"}[5m]), 0.001)",
+          "legendFormat": "Replica Question Share"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.05 },
+              { "color": "red", "value": 0.2 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Replication Lag",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "mysql_slave_status_seconds_behind_master{role=\"replica\"}",
+          "legendFormat": "Seconds Behind Source"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "상위 Query Digest 실행 빈도",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "topk(5, rate(mysql_perf_schema_events_statements_total{role=~\"$role\"}[5m]))",
+          "legendFormat": "{{role}} {{schema}} {{digest_text}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    }
+  ],
+  "schemaVersion": 38,
+  "version": 1
+}

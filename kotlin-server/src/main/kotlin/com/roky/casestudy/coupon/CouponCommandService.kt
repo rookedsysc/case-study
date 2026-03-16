@@ -2,6 +2,7 @@ package com.roky.casestudy.coupon
 
 import com.roky.casestudy.store.StoreRepository
 import com.roky.casestudy.user.AppUserRepository
+import java.util.UUID
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,7 +19,7 @@ class CouponCommandService(
      * markCouponIssued 실패 시 트랜잭션 롤백으로 save도 취소됩니다.
      */
     @Transactional
-    fun saveAndMarkIssued(storeId: Long, userId: Long): CouponEntity {
+    fun saveAndMarkIssued(storeId: UUID, userId: UUID): CouponEntity {
         val coupon =
             couponRepository.save(
                 CouponEntity(

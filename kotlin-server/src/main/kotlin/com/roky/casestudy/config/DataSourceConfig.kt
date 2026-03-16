@@ -14,13 +14,20 @@ import javax.sql.DataSource
 
 /**
  * Read/Write 분리를 위한 DataSource 라우팅 설정.
- * spring.datasource.source-only=true 설정 시 모든 쿼리가 write(source) DataSource로 라우팅된다.
+ * spring.datasource.source-only=true 설정 시 모든 쿼리가 source DataSource로 라우팅된다.
  */
 @Configuration
 class DataSourceConfig {
 
     @Value("\${spring.datasource.source-only:false}")
     private var sourceOnly: Boolean = false
+
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource.source")
+    fun sourceDataSource(): HikariDataSource =
+        DataSourceBuilder.create().type(HikariDataSource::class.java).build().apply {
+            poolName = "source-pool"
+        }
 
     @Bean
     @ConfigurationProperties(prefix = "spring.datasource.write")
@@ -39,17 +46,19 @@ class DataSourceConfig {
 
     @Bean
     fun routingDataSource(
+        sourceDataSource: HikariDataSource,
         writeDataSource: HikariDataSource,
         readDataSource: HikariDataSource,
     ): DataSource {
-        val routing = ReadWriteRoutingDataSource(sourceOnly)
+        val routing = ReadWriteRoutingDataSource()
+        val writeTargetDataSource = if (sourceOnly) sourceDataSource else writeDataSource
         routing.setTargetDataSources(
             mapOf<Any, Any>(
-                DataSourceType.WRITE to writeDataSource,
-                DataSourceType.READ to readDataSource,
+                DataSourceType.WRITE to writeTargetDataSource,
+                DataSourceType.READ to if (sourceOnly) sourceDataSource else readDataSource,
             ),
         )
-        routing.setDefaultTargetDataSource(writeDataSource)
+        routing.setDefaultTargetDataSource(writeTargetDataSource)
         return routing
     }
 
@@ -67,13 +76,10 @@ enum class DataSourceType {
 
 /**
  * 현재 트랜잭션의 readOnly 여부에 따라 write/read DataSource를 결정한다.
- * @param sourceOnly true이면 readOnly 트랜잭션도 write(source)로 라우팅한다.
  */
-class ReadWriteRoutingDataSource(
-    private val sourceOnly: Boolean,
-) : AbstractRoutingDataSource() {
+class ReadWriteRoutingDataSource : AbstractRoutingDataSource() {
     override fun determineCurrentLookupKey(): DataSourceType =
-        if (sourceOnly || !TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+        if (!TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
             DataSourceType.WRITE
         } else {
             DataSourceType.READ

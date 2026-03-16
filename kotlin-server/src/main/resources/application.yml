@@ -4,6 +4,16 @@ spring:
 
   datasource:
     source-only: ${MYSQL_SOURCE_ONLY:false}
+    source:
+      jdbc-url: jdbc:mysql://${MYSQL_SOURCE_HOST:${FLYWAY_HOST:localhost}}:${MYSQL_SOURCE_PORT:${FLYWAY_PORT:3306}}/${MYSQL_DATABASE:casestudy}
+      username: ${MYSQL_USER:appuser}
+      password: ${MYSQL_PASSWORD:apppassword}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
     write:
       jdbc-url: jdbc:mysql://${MYSQL_WRITE_HOST:localhost}:${MYSQL_WRITE_PORT:6033}/${MYSQL_DATABASE:casestudy}
       username: ${MYSQL_USER:appuser}

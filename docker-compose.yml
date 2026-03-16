@@ -68,7 +68,6 @@ services:
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
       - MYSQL_USER=${MYSQL_USER:-appuser}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
-      - MYSQL_REPL_PASSWORD=${MYSQL_REPL_PASSWORD:-replpassword}
     ports:
       - "${MYSQL_SOURCE_HOST_PORT:-3306}:3306"
     volumes:
@@ -91,9 +90,7 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
-      - MYSQL_USER=${MYSQL_USER:-appuser}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
-      - MYSQL_REPL_PASSWORD=${MYSQL_REPL_PASSWORD:-replpassword}
     ports:
       - "${MYSQL_REPLICA_HOST_PORT:-3307}:3306"
     volumes:

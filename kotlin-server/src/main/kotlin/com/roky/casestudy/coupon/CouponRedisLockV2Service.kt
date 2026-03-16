@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service
 @Service
 class CouponRedisLockV2Service(
     private val couponRepository: CouponRepository,
+    private val couponCommandService: CouponCommandService,
     private val couponRedisCoordinator: CouponRedisCoordinator,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
     private val storeRepository: StoreRepository,
@@ -21,7 +22,7 @@ class CouponRedisLockV2Service(
     fun issueCoupon(request: IssueCouponRequest): CouponResponse {
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
-        var stockDecreased = false
+        var shouldRollbackStock = false
 
         try {
             val store =
@@ -31,13 +32,13 @@ class CouponRedisLockV2Service(
                         .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
                 }
 
-            stockDecreased =
+            shouldRollbackStock =
                 couponRedisCoordinator.decreaseRemainingStock(
                     storeId = store.storeId,
                     eventTotalCount = store.eventTotalCount,
                     issuedCountLoader = { couponRepository.countByStoreId(storeId) },
                 )
-            if (!stockDecreased) {
+            if (!shouldRollbackStock) {
                 throw CouponLimitExceededException(storeId)
             }
 
@@ -56,17 +57,10 @@ class CouponRedisLockV2Service(
                 throw DuplicateCouponException(storeId, userId)
             }
 
-            val coupon =
-                couponRepository.save(
-                    CouponEntity(
-                        store = storeRepository.getReferenceById(storeId),
-                        user = appUserRepository.getReferenceById(userId),
-                    ),
-                )
-            couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
+            val coupon = couponCommandService.saveAndMarkIssued(storeId, userId)
             return CouponMapper.toResponse(coupon)
         } catch (e: DataIntegrityViolationException) {
-            if (stockDecreased) {
+            if (shouldRollbackStock) {
                 couponRedisCoordinator.rollbackStock(storeId)
             }
             if (e.mostSpecificCause.message?.contains(COUPON_UNIQUE_CONSTRAINT_NAME) == true) {
@@ -75,7 +69,7 @@ class CouponRedisLockV2Service(
             }
             throw e
         } catch (e: RuntimeException) {
-            if (stockDecreased) {
+            if (shouldRollbackStock) {
                 couponRedisCoordinator.rollbackStock(storeId)
             }
             throw e

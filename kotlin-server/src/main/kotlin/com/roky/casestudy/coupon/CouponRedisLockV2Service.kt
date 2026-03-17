@@ -6,7 +6,6 @@ import com.roky.casestudy.coupon.exception.CouponLimitExceededException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import com.roky.casestudy.store.StoreRepository
 import com.roky.casestudy.user.AppUserRepository
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 
 @Service
@@ -23,7 +22,6 @@ class CouponRedisLockV2Service(
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
         var shouldRollbackStock = false
-        var hasError = true
 
         try {
             val store =
@@ -60,22 +58,12 @@ class CouponRedisLockV2Service(
 
             val coupon = couponCommandService.saveAndMarkIssued(storeId, userId)
             val response = CouponMapper.toResponse(coupon)
-            hasError = false
             return response
-        } catch (e: DataIntegrityViolationException) {
-            if (e.mostSpecificCause.message?.contains(COUPON_UNIQUE_CONSTRAINT_NAME) == true) {
-                couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
-                throw DuplicateCouponException(storeId, userId)
-            }
-            throw e
-        } finally {
-            if (hasError && shouldRollbackStock) {
+        }  catch (e: RuntimeException) {
+            if (shouldRollbackStock) {
                 couponRedisCoordinator.rollbackStock(storeId)
             }
+            throw e
         }
-    }
-
-    companion object {
-        private const val COUPON_UNIQUE_CONSTRAINT_NAME = "uk_coupon_store_user"
     }
 }

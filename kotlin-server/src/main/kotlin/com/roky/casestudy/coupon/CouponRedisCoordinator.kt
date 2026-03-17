@@ -16,10 +16,8 @@ class CouponRedisCoordinator(
 ) {
     private val decreaseStockScript: String =
         ClassPathResource("scripts/decrease-stock.lua").inputStream.bufferedReader().readText()
-    private val cacheLoadLockWaitTimeout = Duration.ofMillis(300)
-    private val cacheLoadLockTtl = Duration.ofSeconds(2)
+    private val cacheLoadLockWaitTimeout = Duration.ofSeconds(2)
     private val userLockWaitTimeout = Duration.ofSeconds(2)
-    private val userLockTtl = Duration.ofSeconds(5)
 
     /**
      * 유저 단위 락을 획득한 뒤 액션을 실행하고 반드시 락을 해제합니다.
@@ -42,7 +40,7 @@ class CouponRedisCoordinator(
         action: () -> T,
     ): T {
         val lock = redissonClient.getLock(userLockKey(userId))
-        val acquired = lock.tryLock(userLockWaitTimeout.toMillis(), userLockTtl.toMillis(), TimeUnit.MILLISECONDS)
+        val acquired = lock.tryLock(userLockWaitTimeout.toMillis(), TimeUnit.MILLISECONDS)
         if (!acquired) {
             throw CouponIssueInProgressException(userId)
         }
@@ -53,7 +51,11 @@ class CouponRedisCoordinator(
             actionException = e
             throw e
         } finally {
-            runCatching { lock.unlock() }
+            runCatching {
+                if (lock.isHeldByCurrentThread) {
+                    lock.unlock()
+                }
+            }
                 .onFailure { unlockEx ->
                     actionException?.addSuppressed(unlockEx) ?: throw unlockEx
                 }
@@ -72,7 +74,7 @@ class CouponRedisCoordinator(
         readCached()?.let { return it }
 
         val lock = redissonClient.getLock(lockKey)
-        val acquired = lock.tryLock(cacheLoadLockWaitTimeout.toMillis(), cacheLoadLockTtl.toMillis(), TimeUnit.MILLISECONDS)
+        val acquired = lock.tryLock(cacheLoadLockWaitTimeout.toMillis(), TimeUnit.MILLISECONDS)
         if (!acquired) {
             return readCached() ?: throw CouponCacheLoadLockTimeoutException(lockKey)
         }
@@ -80,7 +82,9 @@ class CouponRedisCoordinator(
         return try {
             readCached() ?: loadAndCache()
         } finally {
-            lock.unlock()
+            if (lock.isHeldByCurrentThread) {
+                lock.unlock()
+            }
         }
     }
 

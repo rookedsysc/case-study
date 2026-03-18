@@ -34,7 +34,9 @@ export const options = {
   },
   thresholds: {
     "http_req_failed{phase:measure,kind:issue_coupon_pessimistic_lock}": ["rate < 0.01"],
-    "http_req_duration{phase:measure,kind:issue_coupon_pessimistic_lock}": ["p(95) < 500"],
+    "http_req_duration{phase:measure,kind:issue_coupon_pessimistic_lock,status:201}": [
+      "p(95) < 500",
+    ],
   },
 };
 

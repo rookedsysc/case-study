@@ -34,12 +34,14 @@ out/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
+### Idea ###
 .vscode/
 .claude/plan
+**.DS_Store**
 
 ### Kotlin ###
 .kotlin
 
 ### Docker ###
 .env
+

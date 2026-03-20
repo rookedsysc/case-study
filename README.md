@@ -18,6 +18,15 @@
 - Redis Cluster Proxy: `7777` (기본값, `.env`에서 `REDIS_CLUSTER_PROXY_HOST_PORT`로 변경 가능)
 - Grafana/Prometheus/Loki: `3000` / `9090` / `3100`
 
+## 앱 스케일링과 관측
+
+- 일반 `docker compose` 환경에서는 `app.deploy.replicas` 값만 바꿔도 인스턴스가 늘어나지 않는다.
+- 앱 인스턴스 수를 늘릴 때는 `docker compose up -d --scale app=5`처럼 `--scale` 옵션을 사용한다.
+- `nginx`는 Docker DNS를 통해 `app` 서비스를 동적으로 해석하도록 설정되어 있어, 스케일된 `app` 인스턴스로 트래픽을 분산한다.
+- `prometheus`는 `app` 서비스 DNS 기반으로 메트릭 대상을 발견하므로, 앱 스케일 이후에도 별도 수정 없이 메트릭 수집을 유지한다.
+- `nginx`의 `access.log`, `error.log`는 공유 볼륨을 통해 `otel-collector`가 수집하고 Loki로 전달한다.
+- `grafana`는 Prometheus/Loki를 데이터 소스로 사용하므로, 앱 수 증가만으로 별도 설정 변경은 필요하지 않다.
+
 ## Redis Cluster 연결
 
 - Docker 내부: `redis://:redispassword@redis-cluster-proxy:7777`

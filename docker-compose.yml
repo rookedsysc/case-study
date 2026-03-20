@@ -8,6 +8,7 @@ services:
     volumes:
       - ./nginx/nginx-global.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - nginx-logs:/var/log/nginx
     ulimits:
       nofile:
         soft: 16384
@@ -371,6 +372,7 @@ services:
     command: ["--config=/etc/otel/otel-collector-config.yaml"]
     volumes:
       - ./otel/otel-collector-config.yaml:/etc/otel/otel-collector-config.yaml:ro
+      - nginx-logs:/var/log/nginx:ro
     depends_on:
       - loki
     deploy:
@@ -457,6 +459,20 @@ services:
           cpus: 0.5
           memory: 256M
 
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4.2
+    command:
+      - "--nginx.scrape-uri=http://nginx:8080/stub_status"
+    ports:
+      - "${NGINX_EXPORTER_HOST_PORT:-9113}:9113"
+    depends_on:
+      - nginx
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 128M
+
 volumes:
   mysql-source-data:
   mysql-replica-data:
@@ -465,5 +481,6 @@ volumes:
   redis-cluster-node-2-data:
   redis-cluster-node-3-data:
   grafana-data:
+  nginx-logs:
   prometheus-data:
   loki-data:

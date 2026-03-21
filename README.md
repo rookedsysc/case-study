@@ -16,7 +16,7 @@
 - Redis 단일: `6379`
 - Redis Cluster 노드: `7001~7003`
 - Redis Cluster Proxy: `7777` (기본값, `.env`에서 `REDIS_CLUSTER_PROXY_HOST_PORT`로 변경 가능)
-- Grafana/Prometheus/Loki: `3000` / `9090` / `3100`
+- Grafana/Prometheus/Loki: `33001` / `39090` / `33100` (`.env` 기본값 기준)
 
 ## 앱 스케일링과 관측
 
@@ -26,6 +26,63 @@
 - `prometheus`는 `app` 서비스 DNS 기반으로 메트릭 대상을 발견하므로, 앱 스케일 이후에도 별도 수정 없이 메트릭 수집을 유지한다.
 - `nginx`의 `access.log`, `error.log`는 공유 볼륨을 통해 `otel-collector`가 수집하고 Loki로 전달한다.
 - `grafana`는 Prometheus/Loki를 데이터 소스로 사용하므로, 앱 수 증가만으로 별도 설정 변경은 필요하지 않다.
+
+## k6 결과를 Grafana에서 보기
+
+- 이 저장소는 이미 `prometheus` Remote Write 수신이 켜지도록 설정해두었으므로, k6 결과를 바로 Grafana에서 볼 수 있다.
+
+적용 후 재시작:
+
+```bash
+docker compose up -d prometheus grafana
+```
+
+k6 실행 예시:
+
+```bash
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" k6 run -o experimental-prometheus-rw -e BASE_URL=http://localhost:38080 k6/shopping-mall/coupon-redis-lock-v2-only-load.js
+```
+
+- `BASE_URL`은 `.env`의 `NGINX_HOST_PORT` 기본값 기준으로 `http://localhost:38080`을 사용했다.
+- `K6_PROMETHEUS_RW_SERVER_URL`은 `.env`의 `PROMETHEUS_HOST_PORT` 기본값 기준으로 `http://localhost:39090/api/v1/write`를 사용해야 한다.
+- 실행이 끝나면 `bash .claude/hooks/kanvibe-stop-hook.sh`까지 이어서 호출되므로 한 줄로 바로 확인하기 좋다.
+- 다른 스크립트를 실행할 때는 마지막 파일 경로만 바꾸면 된다.
+
+스크립트별 실행 예시:
+
+```bash
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" k6 run -o experimental-prometheus-rw -e BASE_URL=http://localhost:38080 k6/shopping-mall/coupon-redis-lock-v2-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
+```
+
+```bash
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" k6 run -o experimental-prometheus-rw -e BASE_URL=http://localhost:38080 k6/shopping-mall/coupon-redis-lock-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
+```
+
+```bash
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" k6 run -o experimental-prometheus-rw -e BASE_URL=http://localhost:38080 k6/shopping-mall/coupon-pessimistic-lock-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
+```
+
+Grafana 확인 방법:
+
+- 접속 주소: `http://localhost:33001`
+- 기본 로그인: `admin / ${GRAFANA_PASSWORD:-admin}`
+- `Connections > Data sources`에서 `Prometheus`가 연결되어 있는지 확인한다.
+- `Dashboards`에서 프로비저닝된 `k6 Load Test` 대시보드를 열면 k6 메트릭과 애플리케이션 메트릭을 같이 볼 수 있다.
+- `k6 Load Test` 대시보드에서는 `k6 HTTP 요청 수`, `k6 체크 성공률`, `k6 HTTP 응답 시간`, `k6 실패율`, `k6 활성 VUs`, `k6 네트워크 처리량`과 함께 `애플리케이션 HTTP 요청 수`, `애플리케이션 HTTP 응답 시간`, `프로세스 CPU 사용률`, `HikariCP Pool 사용률`을 같이 확인할 수 있다.
+
+바로 확인하기 좋은 PromQL 예시:
+
+```promql
+sum(rate(k6_http_reqs[1m]))
+```
+
+```promql
+avg(k6_http_req_duration_avg)
+```
+
+```promql
+avg(k6_checks_rate)
+```
 
 ## Redis Cluster 연결
 

@@ -31,12 +31,12 @@ services:
     environment:
       - APP_PORT=${APP_PORT:-8080}
       - JAVA_OPTS=-XX:+UseG1GC -Xms384m -Xmx512m -XX:ActiveProcessorCount=1 -XX:MaxDirectMemorySize=128m -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:gc*:stdout:time,uptime,level,tags
-      - MYSQL_HOST=proxysql
-      - MYSQL_PORT=6033
-      - MYSQL_WRITE_HOST=proxysql
-      - MYSQL_WRITE_PORT=6033
-      - MYSQL_READ_HOST=proxysql
-      - MYSQL_READ_PORT=6033
+      - MYSQL_HOST=${MYSQL_HOST:-proxysql}
+      - MYSQL_PORT=${MYSQL_PORT:-6033}
+      - MYSQL_WRITE_HOST=${MYSQL_WRITE_HOST:-proxysql}
+      - MYSQL_WRITE_PORT=${MYSQL_WRITE_PORT:-6033}
+      - MYSQL_READ_HOST=${MYSQL_READ_HOST:-proxysql}
+      - MYSQL_READ_PORT=${MYSQL_READ_PORT:-6033}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
       - MYSQL_USER=${MYSQL_USER:-appuser}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
@@ -134,12 +134,24 @@ services:
   proxysql:
     image: proxysql/proxysql:2.7.1
     ports:
-      - "${PROXYSQL_HOST_PORT:-6033}:6033"
-      - "${PROXYSQL_ADMIN_HOST_PORT:-6032}:6032"
+      - "${PROXYSQL_HOST_PORT:-36033}:6033"
+      - "${PROXYSQL_ADMIN_HOST_PORT:-36032}:6032"
     volumes:
       - ./proxysql/proxysql.cnf:/etc/proxysql.cnf:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-P", "6033", "-u", "appuser", "-papppassword"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-P",
+          "6033",
+          "-u",
+          "appuser",
+          "-papppassword",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -338,7 +350,7 @@ services:
     entrypoint:
       - "/bin/sh"
       - "-c"
-      - "sed 's|__APP_PORT__|${APP_PORT:-8080}|g' /etc/prometheus/prometheus.yml > /tmp/prometheus.yml && exec /bin/prometheus --config.file=/tmp/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --web.enable-lifecycle"
+      - "sed 's|__APP_PORT__|${APP_PORT:-8080}|g' /etc/prometheus/prometheus.yml > /tmp/prometheus.yml && exec /bin/prometheus --config.file=/tmp/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --web.enable-lifecycle --web.enable-remote-write-receiver"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules:/etc/prometheus/rules:ro

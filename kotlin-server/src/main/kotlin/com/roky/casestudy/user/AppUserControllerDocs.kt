@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 
@@ -33,6 +34,7 @@ interface AppUserControllerDocs {
     )
     fun createUsersBulk(
         @Parameter(description = "유저 일괄 생성 요청", required = true)
+        @Valid
         request: BulkCreateAppUsersRequest,
     ): BulkCreateAppUsersResponse
 

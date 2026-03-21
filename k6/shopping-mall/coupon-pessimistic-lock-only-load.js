@@ -21,17 +21,19 @@ const CONFIG = {
   storeCount: 1,
   // 한 매장에서 발급 가능한 전체 쿠폰 수량입니다.
   storeEventTotalCount: 512,
-  // 부하를 줄 유저 수입니다.
-  userCount: 4096,
-  // 유저를 한 번에 생성할 최대 개수입니다.
-  bulkCreateLimit: 1000,
+  // setup 단계에서 조회할 기존 유저 수입니다.
+  userCount: 512,
+  // 한 번에 조회할 기존 유저 ID 최대 개수입니다.
+  userPageSize: 2000,
   // 동시에 요청을 보내는 가상 사용자 수입니다.
-  vus: 9216,
+  vus: 10000,
   // 부하를 유지할 시간입니다.
   duration: "5m",
+  // setup 단계에서 테스트 데이터 생성을 기다릴 최대 시간입니다.
+  setupTimeout: __ENV.SETUP_TIMEOUT || "10m",
   tags: {
     createStores: { phase: "setup", kind: "create_stores_bulk" },
-    createUsers: { phase: "setup", kind: "create_users_bulk" },
+    readUsers: { phase: "setup", kind: "read_existing_user_ids" },
     // 실제 성능 측정 대상인 비관적 락 쿠폰 발급 요청 태그입니다.
     issueCoupon: { phase: "measure", kind: "issue_coupon_pessimistic_lock" },
     readStatistics: {
@@ -43,6 +45,7 @@ const CONFIG = {
 };
 
 export const options = {
+  setupTimeout: CONFIG.setupTimeout,
   scenarios: {
     // 고정된 VU 수로 전체 테스트 시간 동안 계속 요청을 보냅니다.
     coupon_issue_only_pessimistic_lock: {
@@ -99,8 +102,33 @@ function readIds(response, expectedCount, resourceName) {
     !Array.isArray(body.ids) ||
     body.ids.length !== expectedCount
   ) {
+    const responseBody =
+      typeof response.body === "string" && response.body.length > 500
+        ? `${response.body.slice(0, 500)}...`
+        : response.body;
     throw new Error(
-      `${resourceName} bulk 생성에 실패했습니다 (count=${expectedCount})`,
+      `${resourceName} bulk 생성에 실패했습니다 (count=${expectedCount}, status=${response.status}, body=${responseBody})`,
+    );
+  }
+
+  return body.ids;
+}
+
+function readUserIdsPage(response, requestedCount) {
+  const body = parseJson(response);
+
+  if (
+    response.status !== 200 ||
+    body === null ||
+    !Array.isArray(body.ids) ||
+    body.ids.length > requestedCount
+  ) {
+    const responseBody =
+      typeof response.body === "string" && response.body.length > 500
+        ? `${response.body.slice(0, 500)}...`
+        : response.body;
+    throw new Error(
+      `기존 user ID 조회에 실패했습니다 (requestedCount=${requestedCount}, status=${response.status}, body=${responseBody})`,
     );
   }
 
@@ -122,23 +150,27 @@ function createStoreId() {
 
 function createUserIds() {
   const userIds = [];
+  let page = 0;
 
-  for (
-    let createdUserCount = 0;
-    createdUserCount < CONFIG.userCount;
-    createdUserCount += CONFIG.bulkCreateLimit
-  ) {
+  while (userIds.length < CONFIG.userCount) {
     const currentBatchSize = Math.min(
-      CONFIG.bulkCreateLimit,
-      CONFIG.userCount - createdUserCount,
+      CONFIG.userPageSize,
+      CONFIG.userCount - userIds.length,
     );
-    const response = postJson(
-      "/api/users/bulk",
-      { count: currentBatchSize },
-      CONFIG.tags.createUsers,
+    const response = getJson(
+      `/api/users/ids?page=${page}&size=${currentBatchSize}`,
+      CONFIG.tags.readUsers,
     );
+    const pagedUserIds = readUserIdsPage(response, currentBatchSize);
 
-    userIds.push(...readIds(response, currentBatchSize, "user"));
+    if (pagedUserIds.length === 0) {
+      throw new Error(
+        `기존 user가 부족합니다 (requiredCount=${CONFIG.userCount}, loadedCount=${userIds.length})`,
+      );
+    }
+
+    userIds.push(...pagedUserIds);
+    page += 1;
   }
 
   return userIds;

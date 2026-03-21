@@ -1,8 +1,9 @@
 package com.roky.casestudy.user
 
-import com.roky.casestudy.user.dto.AppUserResponse
+import com.roky.casestudy.user.dto.AppUserIdsResponse
 import com.roky.casestudy.user.dto.BulkCreateAppUsersResponse
-import com.roky.casestudy.user.dto.CreateAppUserRequest
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -21,5 +22,19 @@ class AppUserService(
         val users = (1..count).map { AppUserEntity(name = "bulk_user_${UUID.randomUUID()}") }
         val savedUsers = appUserRepository.saveAll(users)
         return BulkCreateAppUsersResponse(ids = savedUsers.map { it.id })
+    }
+
+    /**
+     * 기존 유저 ID를 페이지 단위로 조회합니다.
+     * 부하 테스트에서 재사용할 유저 풀을 준비할 때 사용됩니다.
+     *
+     * @param page 조회할 페이지 번호 (0 이상)
+     * @param size 페이지당 조회할 유저 수 (1 이상 2000 이하)
+     * @returns 조회된 유저 ID 목록
+     */
+    fun getUserIds(page: Int, size: Int): AppUserIdsResponse {
+        val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "createdAt"))
+        val userIds = appUserRepository.findAll(pageable).content.map { it.id }
+        return AppUserIdsResponse(ids = userIds)
     }
 }

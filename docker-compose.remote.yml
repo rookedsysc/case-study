@@ -19,6 +19,15 @@ services:
       app:
         condition: service_healthy
 
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4.2
+    command:
+      - "--nginx.scrape-uri=http://nginx:8080/stub_status"
+    ports:
+      - "${NGINX_EXPORTER_HOST_PORT:-9113}:9113"
+    depends_on:
+      - nginx
+
   app:
     build: ./kotlin-server
     extra_hosts:

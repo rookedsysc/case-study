@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 
 @Tag(name = "shopping mall case", description = "쇼핑몰 케이스 스터디 API")
 interface AppUserControllerDocs {
@@ -51,8 +53,11 @@ interface AppUserControllerDocs {
     )
     fun getUserIds(
         @Parameter(description = "조회할 페이지 번호", required = false)
+        @Min(0)
         page: Int,
         @Parameter(description = "페이지당 조회 개수 (1 이상 2000 이하)", required = false)
+        @Min(1)
+        @Max(2000)
         size: Int,
     ): AppUserIdsResponse
 }

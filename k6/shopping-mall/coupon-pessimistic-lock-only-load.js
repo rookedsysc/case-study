@@ -1,6 +1,5 @@
 import http from "k6/http";
 import { check } from "k6";
-import exec from "k6/execution";
 import { Rate, Trend } from "k6/metrics";
 
 const ISSUE_COUPON_SUCCESS_RATE = new Rate("issue_coupon_success_rate");
@@ -20,13 +19,13 @@ const CONFIG = {
   // 테스트 데이터를 만들 때 사용할 매장 수입니다.
   storeCount: 1,
   // 한 매장에서 발급 가능한 전체 쿠폰 수량입니다.
-  storeEventTotalCount: 512,
+  storeEventTotalCount: 5000,
   // setup 단계에서 조회할 기존 유저 수입니다.
-  userCount: 512,
+  userCount: 20000,
   // 한 번에 조회할 기존 유저 ID 최대 개수입니다.
   userPageSize: 2000,
   // 동시에 요청을 보내는 가상 사용자 수입니다.
-  vus: 10000,
+  vus: 4500,
   // 부하를 유지할 시간입니다.
   duration: "5m",
   // setup 단계에서 테스트 데이터 생성을 기다릴 최대 시간입니다.

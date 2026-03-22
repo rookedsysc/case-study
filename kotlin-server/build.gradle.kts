@@ -32,6 +32,7 @@ dependencies {
     implementation("org.springframework:spring-aop")
     implementation("org.aspectj:aspectjweaver")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("org.springframework.kafka:spring-kafka")
     implementation("org.redisson:redisson:3.50.0")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-flyway")

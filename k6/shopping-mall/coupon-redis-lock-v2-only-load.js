@@ -1,4 +1,4 @@
-import { check } from "k6";
+import { check, sleep } from "k6";
 import http from "k6/http";
 import { Rate, Trend } from "k6/metrics";
 
@@ -21,15 +21,23 @@ const CONFIG = {
   // 한 매장에서 발급 가능한 전체 쿠폰 수량입니다.
   storeEventTotalCount: 5000,
   // setup 단계에서 조회할 기존 유저 수입니다.
-  userCount: 5000,
+  userCount: 20000,
   // 한 번에 조회할 기존 유저 ID 최대 개수입니다.
   userPageSize: 2000,
   // 동시에 요청을 보내는 가상 사용자 수입니다.
-  vus: 3000,
+  vus: 4500,
   // 부하를 유지할 시간입니다.
   duration: "5m",
+  // k6 기본 60초 요청 타임아웃에 걸리지 않도록 충분히 크게 둡니다.
+  requestTimeout: __ENV.REQUEST_TIMEOUT || "10m",
+  // 종료 시점에도 진행 중인 요청 응답을 최대한 수집하도록 충분히 기다립니다.
+  gracefulStop: __ENV.GRACEFUL_STOP || "10m",
   // setup 단계에서 테스트 데이터 생성을 기다릴 최대 시간입니다.
   setupTimeout: __ENV.SETUP_TIMEOUT || "10m",
+  // teardown 검증 전에 서버 후처리가 끝날 때까지 대기할 최대 시간(ms)입니다.
+  verifyTimeoutMs: Number(__ENV.VERIFY_TIMEOUT_MS || 120000),
+  // teardown 통계 재조회 간격(초)입니다.
+  verifyPollIntervalSeconds: Number(__ENV.VERIFY_POLL_INTERVAL_SECONDS || 2),
   tags: {
     createStores: { phase: "setup", kind: "create_stores_bulk" },
     readUsers: { phase: "setup", kind: "read_existing_user_ids" },
@@ -51,6 +59,7 @@ export const options = {
       executor: "constant-vus",
       vus: CONFIG.vus,
       duration: CONFIG.duration,
+      gracefulStop: CONFIG.gracefulStop,
     },
   },
 };
@@ -80,6 +89,7 @@ function postJson(
   return http.post(`${CONFIG.baseUrl}${path}`, JSON.stringify(payload), {
     headers: CONFIG.headers,
     tags,
+    timeout: CONFIG.requestTimeout,
     responseCallback,
   });
 }
@@ -88,6 +98,7 @@ function getJson(path, tags, responseCallback = http.expectedStatuses(200)) {
   return http.get(`${CONFIG.baseUrl}${path}`, {
     headers: CONFIG.headers,
     tags,
+    timeout: CONFIG.requestTimeout,
     responseCallback,
   });
 }
@@ -184,6 +195,18 @@ function getAssignedUserId(userIds) {
   return userIds[userIndex];
 }
 
+function readCouponStatistics(storeId) {
+  const response = getJson(
+    `/api/coupons/stores/${storeId}/statistics`,
+    CONFIG.tags.readStatistics,
+  );
+
+  return {
+    response,
+    body: parseJson(response),
+  };
+}
+
 export function setup() {
   return {
     storeId: createStoreId(),
@@ -192,11 +215,20 @@ export function setup() {
 }
 
 export function teardown(data) {
-  const response = getJson(
-    `/api/coupons/stores/${data.storeId}/statistics`,
-    CONFIG.tags.readStatistics,
-  );
-  const body = parseJson(response);
+  const verifyStartedAt = Date.now();
+  let statistics = readCouponStatistics(data.storeId);
+
+  while (
+    Date.now() - verifyStartedAt < CONFIG.verifyTimeoutMs &&
+    statistics.response.status === 200 &&
+    statistics.body !== null &&
+    statistics.body.issuedCouponCount < CONFIG.storeEventTotalCount
+  ) {
+    sleep(CONFIG.verifyPollIntervalSeconds);
+    statistics = readCouponStatistics(data.storeId);
+  }
+
+  const { response, body } = statistics;
 
   const isValid = check(response, {
     "통계 조회 성공": (result) => result.status === 200,
@@ -215,8 +247,11 @@ export function teardown(data) {
   });
 
   if (!isValid) {
+    const issuedCouponCount = body !== null ? body.issuedCouponCount : "unknown";
+    const remainingCouponCount =
+      body !== null ? body.remainingCouponCount : "unknown";
     throw new Error(
-      `쿠폰 통계 검증에 실패했습니다: ${response.status} ${response.body}`,
+      `쿠폰 통계 검증에 실패했습니다 (waitedMs=${Date.now() - verifyStartedAt}, status=${response.status}, issuedCouponCount=${issuedCouponCount}, remainingCouponCount=${remainingCouponCount}, body=${response.body})`,
     );
   }
 }

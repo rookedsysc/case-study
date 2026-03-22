@@ -11,11 +11,13 @@
 
 [비관적락 테스트](#비관적-락-테스트-결과)를 진행했을 때 목표 QPS인 `4500 req/s`에 크게 못 미치는 결과가 나와서 이를 해결하기 위해서 Redis 락을 도입했다. 동일 유저 중복 조회 방지, Coupon 개수 정합성, 상점 이벤트 정보와 유저 정보 등을 Cache Aside 했음에도 목표 QPS 달성에는 실패했다. 
 
-심지어 Redisson에서 Netty Connection Pool이 고갈되는 현상까지 발생해서 쿠폰 정합성이 맞지 않는 버그도 함께 발생했다. 이때는 실제로 두 종류의 문제가 겹쳐 있었다. 첫 번째는 `CouponRepository.save()` 이후 Redis에 해당 유저의 발급 여부를 기록하는 흐름이 트랜잭션으로 묶여 있지 않았다는 점이다. 그래서 `save()`는 성공했는데 Redis 기록 단계에서 예외가 발생하면 Fallback 로직을 타면서 DB에는 쿠폰이 저장됐지만 Redis에는 발급 기록이 남지 않을 수 있었고, 그 결과 캐시와 DB 사이 정합성이 깨졌다. 이 문제는 이후 `save + markCouponIssued`를 하나의 트랜잭션 경계로 묶으면서 해결했다.
+심지어 Redisson에서 Netty Connection Pool이 고갈되는 현상까지 겹치면서 쿠폰 정합성이 맞지 않는 버그도 함께 발생했다. 이 시점에는 실제로 서로 다른 두 종류의 문제가 동시에 존재했다.
 
-두 번째는 초기 재고 적재 구간의 락 만료 경쟁 조건이었다. 초기에는 같은 유저에 대한 중복 발급을 의심했지만, `storeId + userId` 기준으로 집계했을 때 `count > 1`인 유저가 확인되지 않아 원인을 다시 추적했다. 조사 결과 동일 유저 중복 발급보다는 Redis에 남은 쿠폰 수량을 최초 적재하는 `initializeRemainingStockIfAbsent()` 구간에서 경쟁 조건이 발생했을 가능성이 더 높았다. 당시 구현은 고정 lease time 기반 락을 사용하고 있었는데, 이 락이 작업 중간에 만료되면 다른 트랜잭션이 아직 critical section 안에 여러 개 남아 있는 상태에서도 다시 초기화 로직에 진입할 수 있었다. 그 사이 재고가 `1000`으로 재적재된 뒤 각 요청이 다시 `-1` 감소를 수행하면서, 실제보다 더 높은 재고가 남아 있는 것처럼 측정되는 문제가 생겼다. 서로 다른 시점의 `issuedCount`를 기준으로 남은 재고가 중복 계산되거나 더 오래된 값이 마지막에 덮어써지면서 초과 발급 위험까지 커졌다. 이 문제는 [고정 lease time 대신 watchdog 기반 락으로 전환하고 unlock 시 현재 스레드 보유 여부를 확인하는 변경](https://github.com/rookedsysc/case-study/pull/3/changes/130f0cf0e17f1fbecf0c457df6603bc5555b0033)으로 완화했다.
+첫 번째 문제는 `CouponRepository.save()` 이후 Redis에 해당 유저의 발급 여부를 기록하는 흐름이 하나의 트랜잭션으로 묶여 있지 않았다는 점이다. 그 결과 `save()`는 성공했지만 Redis 기록 단계에서 예외가 발생하면 fallback 로직이 실행되면서 DB에는 쿠폰이 저장됐는데 Redis에는 발급 기록이 남지 않는 상태가 생길 수 있었다. 즉 DB와 Redis 사이의 정합성이 깨질 수 있는 구조였다. 이 문제는 이후 `save + markCouponIssued`를 하나의 트랜잭션 경계로 묶으면서 해결했다.
 
-즉 이 이슈는 단순한 중복 발급 문제가 아니라, DB/Redis 기록 순서 불일치와 재고 캐시 초기화 시점의 동시성 제어 실패가 결합된 복합 장애였다. 따라서 [문제를 근본적으로 해결하면서 Redisson 최적화를 시도](https://github.com/rookedsysc/case-study/pull/10/changes)했다.
+두 번째 문제는 초기 재고 적재 구간의 락 만료 경쟁 조건이었다. 처음에는 같은 유저에 대한 중복 발급을 의심했지만, `storeId + userId` 기준으로 집계했을 때 `count > 1`인 유저가 확인되지 않아 원인을 다시 추적했다. 조사 결과 동일 유저 중복 발급보다는 Redis에 남은 쿠폰 수량을 최초 적재하는 `initializeRemainingStockIfAbsent()` 구간에서 경쟁 조건이 발생했을 가능성이 더 컸다. 당시 구현은 고정 lease time 기반 락을 사용하고 있었는데, 이 락이 작업 중간에 만료되면 다른 트랜잭션이 아직 critical section 안에 남아 있는 상황에서도 다시 초기화 로직에 진입할 수 있었다. 그 사이 재고가 `1000`으로 재적재된 뒤 각 요청이 다시 `-1` 감소를 수행하면서, 실제보다 더 많은 재고가 남아 있는 것처럼 측정되는 문제가 생겼다. 서로 다른 시점의 `issuedCount`를 기준으로 남은 재고가 중복 계산되거나 더 오래된 값이 마지막에 덮어써지면서 초과 발급 위험까지 커졌다. 이 문제는 [고정 lease time 대신 watchdog 기반 락으로 전환하고 unlock 시 현재 스레드 보유 여부를 확인하는 변경](https://github.com/rookedsysc/case-study/pull/3/changes/130f0cf0e17f1fbecf0c457df6603bc5555b0033)으로 완화했다.
+
+즉 이 이슈는 단순한 중복 발급 문제가 아니라, DB와 Redis 기록 경계의 정합성 문제와 재고 캐시 초기화 시점의 동시성 제어 실패가 결합된 복합 장애였다. 그래서 이후에는 [문제를 근본적으로 해결하면서 Redisson 최적화를 함께 시도](https://github.com/rookedsysc/case-study/pull/10/changes)했다.
 
 ## 비관적 락 테스트 결과
 

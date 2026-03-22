@@ -25,7 +25,7 @@ class CouponKafkaV3Service(
     fun issueCoupon(request: IssueCouponRequest): CouponResponse {
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
-        var stockDecreased = false
+        var shouldRollbackStock = false
 
         try {
             val store =
@@ -35,13 +35,13 @@ class CouponKafkaV3Service(
                         .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
                 }
 
-            stockDecreased =
+            shouldRollbackStock =
                 couponRedisCoordinator.decreaseRemainingStock(
                     storeId = store.storeId,
                     eventTotalCount = store.eventTotalCount,
                     issuedCountLoader = { couponRepository.countByStoreId(storeId) },
                 )
-            if (!stockDecreased) {
+            if (!shouldRollbackStock) {
                 throw CouponLimitExceededException(storeId)
             }
 
@@ -80,7 +80,7 @@ class CouponKafkaV3Service(
                 issuedAt = issuedAt,
             )
         } catch (e: RuntimeException) {
-            if (stockDecreased) {
+            if (shouldRollbackStock) {
                 couponRedisCoordinator.rollbackStock(storeId)
             }
             throw e

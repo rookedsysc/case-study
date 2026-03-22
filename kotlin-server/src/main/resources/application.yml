@@ -68,7 +68,7 @@ spring:
         spring.json.trusted.packages: com.roky.casestudy.coupon.dto
         max.poll.records: 10
     listener:
-      idle-between-polls: 100
+      concurrency: 1
 
   data:
     redis:

@@ -31,6 +31,17 @@
 
 - 이 저장소는 이미 `prometheus` Remote Write 수신이 켜지도록 설정해두었으므로, k6 결과를 바로 Grafana에서 볼 수 있다.
 
+유저 사전 데이터 채우기:
+
+```bash
+k6 run -e BASE_URL=http://localhost:38080 -e TARGET_USER_COUNT=20000 k6/shopping-mall/fill-users.js
+```
+
+- `k6/shopping-mall/fill-users.js`는 현재 `/api/users/ids`로 전체 유저 수를 먼저 조회한 뒤, 부족한 수만 `/api/users/bulk`로 최대 1000명씩 나눠 생성한다.
+- `TARGET_USER_COUNT`는 추가 생성 수가 아니라 최종적으로 맞추고 싶은 전체 유저 수다.
+- 기본값은 `BASE_URL=http://localhost:38080`, `TARGET_USER_COUNT=20000`, `READ_PAGE_SIZE=2000`, `CREATE_BATCH_SIZE=1000`, `PARALLEL_REQUESTS=10`이다.
+- 큰 부하를 주는 목적이 아니라 빠르게 테스트용 유저 수를 맞추는 용도라서 `vus=1`, `iterations=1`로 한 번만 실행된다.
+
 적용 후 재시작:
 
 ```bash

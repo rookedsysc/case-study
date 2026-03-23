@@ -115,6 +115,9 @@ otel:
 logging:
   level:
     root: INFO
+    org.apache.kafka.clients.consumer.internals: WARN
+    org.springframework.kafka.listener.KafkaMessageListenerContainer: WARN
+    org.springframework.kafka.listener.ConsumerRebalanceListenerInvoker: WARN
 
   tomcat:
     # 인스턴스 3개 기준 총 1200 스레드 → 1000 VU 동시 요청 수용

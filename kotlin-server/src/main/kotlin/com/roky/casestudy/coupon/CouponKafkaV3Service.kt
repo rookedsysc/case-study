@@ -26,6 +26,7 @@ class CouponKafkaV3Service(
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
         var shouldRollbackStock = false
+        var shouldUnmarkIssued = false
 
         try {
             val store =
@@ -72,6 +73,7 @@ class CouponKafkaV3Service(
                 ),
             )
             couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
+            shouldUnmarkIssued = true
 
             return CouponResponse(
                 id = couponId,
@@ -80,6 +82,9 @@ class CouponKafkaV3Service(
                 issuedAt = issuedAt,
             )
         } catch (e: RuntimeException) {
+            if (shouldUnmarkIssued) {
+                couponIssueCacheAsideStore.unmarkCouponIssued(storeId, userId)
+            }
             if (shouldRollbackStock) {
                 couponRedisCoordinator.rollbackStock(storeId)
             }

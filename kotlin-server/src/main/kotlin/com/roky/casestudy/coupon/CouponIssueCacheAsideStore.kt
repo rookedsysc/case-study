@@ -84,6 +84,13 @@ class CouponIssueCacheAsideStore(
         redisTemplate.opsForValue().set(couponIssuedCacheKey(storeId, userId), ISSUED_CACHE_VALUE, cacheTtlWithJitter())
     }
 
+    fun unmarkCouponIssued(
+        storeId: UUID,
+        userId: UUID,
+    ) {
+        redisTemplate.opsForValue().set(couponIssuedCacheKey(storeId, userId), NOT_ISSUED_CACHE_VALUE, cacheTtlWithJitter())
+    }
+
     private fun cacheTtlWithJitter(): Duration = Duration.ofSeconds(ThreadLocalRandom.current().nextLong(600, 661))
 
     private fun readStoreSnapshot(storeId: UUID): CachedStoreSnapshot? {

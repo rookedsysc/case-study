@@ -35,7 +35,6 @@ class CouponIssueKafkaConsumer(
                     issuedAt = event.issuedAt,
                 ),
             )
-            couponIssueCacheAsideStore.markCouponIssued(event.storeId, event.userId)
         } catch (e: DataIntegrityViolationException) {
             log.warn("쿠폰 중복 저장 무시: storeId={}, userId={}", event.storeId, event.userId)
         } catch (e: Exception) {
@@ -46,6 +45,7 @@ class CouponIssueKafkaConsumer(
                 event.userId,
                 e,
             )
+            couponIssueCacheAsideStore.unmarkCouponIssued(event.storeId, event.userId)
             couponRedisCoordinator.rollbackStock(event.storeId)
         }
     }

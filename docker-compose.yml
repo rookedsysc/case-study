@@ -1,3 +1,9 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   nginx:
     image: nginx:alpine
@@ -9,6 +15,7 @@ services:
       - ./nginx/nginx-global.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
       - nginx-logs:/var/log/nginx
+    logging: *default-logging
     ulimits:
       nofile:
         soft: 16384
@@ -28,6 +35,7 @@ services:
     build: ./kotlin-server
     expose:
       - "${APP_PORT:-8080}"
+    logging: *default-logging
     environment:
       - APP_PORT=${APP_PORT:-8080}
       - JAVA_OPTS=-XX:+UseG1GC -Xms384m -Xmx512m -XX:ActiveProcessorCount=1 -XX:MaxDirectMemorySize=128m -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:gc*:stdout:time,uptime,level,tags
@@ -87,6 +95,7 @@ services:
 
   mysql-source:
     image: mysql:8.4.8
+    logging: *default-logging
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
@@ -111,6 +120,7 @@ services:
 
   mysql-replica:
     image: mysql:8.4.8
+    logging: *default-logging
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
@@ -137,6 +147,7 @@ services:
 
   proxysql:
     image: proxysql/proxysql:2.7.1
+    logging: *default-logging
     ports:
       - "${PROXYSQL_HOST_PORT:-36033}:6033"
       - "${PROXYSQL_ADMIN_HOST_PORT:-36032}:6032"
@@ -173,6 +184,7 @@ services:
 
   kafka:
     image: apache/kafka:latest
+    logging: *default-logging
     ports:
       - "${KAFKA_HOST_PORT:-39092}:9092"
     environment:
@@ -203,6 +215,7 @@ services:
 
   redis:
     image: redis:8.6-alpine
+    logging: *default-logging
     command: redis-server --requirepass ${REDIS_PASSWORD:-redispassword}
     ports:
       - "${REDIS_HOST_PORT:-6379}:6379"
@@ -216,6 +229,7 @@ services:
 
   redis-cluster-node-1:
     image: redis:8.6-alpine
+    logging: *default-logging
     command:
       - sh
       - -c
@@ -241,6 +255,7 @@ services:
 
   redis-cluster-node-2:
     image: redis:8.6-alpine
+    logging: *default-logging
     command:
       - sh
       - -c
@@ -266,6 +281,7 @@ services:
 
   redis-cluster-node-3:
     image: redis:8.6-alpine
+    logging: *default-logging
     command:
       - sh
       - -c
@@ -291,6 +307,7 @@ services:
 
   redis-cluster-init:
     image: redis:8.6-alpine
+    logging: *default-logging
     command:
       - sh
       - -c
@@ -343,6 +360,7 @@ services:
   redis-cluster-proxy:
     image: kornrunner/redis-cluster-proxy:latest
     platform: linux/amd64
+    logging: *default-logging
     command:
       - --port
       - "7777"
@@ -357,6 +375,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.4.0
+    logging: *default-logging
     ports:
       - "${GRAFANA_HOST_PORT:-3000}:3000"
     environment:
@@ -379,6 +398,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.1.0
+    logging: *default-logging
     ports:
       - "${PROMETHEUS_HOST_PORT:-9090}:9090"
     entrypoint:
@@ -397,6 +417,7 @@ services:
 
   loki:
     image: grafana/loki:3.4.1
+    logging: *default-logging
     ports:
       - "${LOKI_HOST_PORT:-3100}:3100"
     command: -config.file=/etc/loki/loki-config.yaml
@@ -411,6 +432,7 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.116.1
+    logging: *default-logging
     ports:
       - "${OTEL_GRPC_HOST_PORT:-4317}:4317"
       - "${OTEL_HTTP_HOST_PORT:-4318}:4318"
@@ -430,6 +452,7 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.8.2
     pid: host
+    logging: *default-logging
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -447,6 +470,7 @@ services:
 
   mysqld-exporter-source:
     image: prom/mysqld-exporter:v0.16.0
+    logging: *default-logging
     environment:
       - MYSQLD_EXPORTER_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
     command:
@@ -469,6 +493,7 @@ services:
 
   mysqld-exporter-replica:
     image: prom/mysqld-exporter:v0.16.0
+    logging: *default-logging
     environment:
       - MYSQLD_EXPORTER_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
     command:
@@ -492,6 +517,7 @@ services:
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.66.0
+    logging: *default-logging
     environment:
       - REDIS_ADDR=redis://redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
@@ -507,6 +533,7 @@ services:
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:1.4.2
+    logging: *default-logging
     command:
       - "--nginx.scrape-uri=http://nginx:8080/stub_status"
     ports:

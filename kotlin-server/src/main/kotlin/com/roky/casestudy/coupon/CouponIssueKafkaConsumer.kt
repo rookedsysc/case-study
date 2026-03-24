@@ -37,7 +37,6 @@ class CouponIssueKafkaConsumer(
             )
         } catch (_: DataIntegrityViolationException) {
             log.warn("쿠폰 중복 저장 무시: storeId={}, userId={}", event.storeId, event.userId)
-            couponRedisCoordinator.rollbackStock(event.storeId)
         } catch (e: Exception) {
             log.error(
                 "쿠폰 저장 실패: couponId={}, storeId={}, userId={}",

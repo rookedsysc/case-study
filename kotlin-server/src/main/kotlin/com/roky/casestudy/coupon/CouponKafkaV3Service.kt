@@ -25,8 +25,8 @@ class CouponKafkaV3Service(
     fun issueCoupon(request: IssueCouponRequest): CouponResponse {
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
-        var shouldRollbackStock = false
-        var shouldUnmarkIssued = false
+        var isStockDecreased = false
+        var isReserved = false
 
         try {
             val store =
@@ -36,18 +36,18 @@ class CouponKafkaV3Service(
                         .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
                 }
 
-            shouldRollbackStock =
+            isStockDecreased =
                 couponRedisCoordinator.decreaseRemainingStock(
                     storeId = store.storeId,
                     eventTotalCount = store.eventTotalCount,
                     issuedCountLoader = { couponRepository.countByStoreId(storeId) },
                 )
-            if (!shouldRollbackStock) {
+            if (!isStockDecreased) {
                 throw CouponLimitExceededException(storeId)
             }
 
-            val isDuplicate =
-                couponIssueCacheAsideStore.verifyUserAndCheckDuplicateCoupon(
+            isReserved =
+                couponIssueCacheAsideStore.verifyUserAndReserveCouponIssue(
                     storeId = storeId,
                     userId = userId,
                     userLoader = {
@@ -57,7 +57,7 @@ class CouponKafkaV3Service(
                     },
                     issuedLoader = { couponRepository.existsByStoreIdAndUserId(storeId, userId) },
                 )
-            if (isDuplicate) {
+            if (!isReserved) {
                 throw DuplicateCouponException(storeId, userId)
             }
 
@@ -72,9 +72,6 @@ class CouponKafkaV3Service(
                     issuedAt = issuedAt,
                 ),
             )
-            couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
-            shouldUnmarkIssued = true
-
             return CouponResponse(
                 id = couponId,
                 storeId = storeId,
@@ -82,10 +79,10 @@ class CouponKafkaV3Service(
                 issuedAt = issuedAt,
             )
         } catch (e: RuntimeException) {
-            if (shouldUnmarkIssued) {
+            if (isReserved) {
                 couponIssueCacheAsideStore.unmarkCouponIssued(storeId, userId)
             }
-            if (shouldRollbackStock) {
+            if (isStockDecreased) {
                 couponRedisCoordinator.rollbackStock(storeId)
             }
             throw e

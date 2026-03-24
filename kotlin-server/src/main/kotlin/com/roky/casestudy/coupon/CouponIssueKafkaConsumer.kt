@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component
  * Kafka 쿠폰 발행 이벤트를 소비하여 DB에 저장합니다.
  *
  * 스로틀링은 application.yml의 max.poll.records(10)와 concurrency(1)로 제어합니다.
- * 중복 저장 시 DataIntegrityViolationException을 무시하여 멱등성을 보장합니다.
+ * 중복 저장 시 신규 발급이 아니므로 재고만 복구하고 issued 캐시는 유지합니다.
  */
 @Component
 class CouponIssueKafkaConsumer(
@@ -35,8 +35,9 @@ class CouponIssueKafkaConsumer(
                     issuedAt = event.issuedAt,
                 ),
             )
-        } catch (e: DataIntegrityViolationException) {
+        } catch (_: DataIntegrityViolationException) {
             log.warn("쿠폰 중복 저장 무시: storeId={}, userId={}", event.storeId, event.userId)
+            couponRedisCoordinator.rollbackStock(event.storeId)
         } catch (e: Exception) {
             log.error(
                 "쿠폰 저장 실패: couponId={}, storeId={}, userId={}",

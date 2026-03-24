@@ -36,11 +36,11 @@ class CouponKafkaV4StageService(
         )
 
     @CouponIssueStageMetric(DUPLICATE_CHECK_STAGE)
-    fun verifyDuplicateCoupon(
+    fun reserveCouponIssue(
         storeId: UUID,
         userId: UUID,
     ): Boolean =
-        couponIssueCacheAsideStore.verifyUserAndCheckDuplicateCoupon(
+        couponIssueCacheAsideStore.verifyUserAndReserveCouponIssue(
             storeId = storeId,
             userId = userId,
             userLoader = {
@@ -66,14 +66,6 @@ class CouponKafkaV4StageService(
                 issuedAt = issuedAt,
             ),
         )
-    }
-
-    @CouponIssueStageMetric(CACHE_MARK_STAGE)
-    fun markCouponIssued(
-        storeId: UUID,
-        userId: UUID,
-    ) {
-        couponIssueCacheAsideStore.markCouponIssued(storeId, userId)
     }
 
     fun unmarkCouponIssued(

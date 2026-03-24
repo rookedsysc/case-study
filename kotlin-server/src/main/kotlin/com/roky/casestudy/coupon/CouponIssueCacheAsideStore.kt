@@ -77,6 +77,31 @@ class CouponIssueCacheAsideStore(
         return hasIssuedCoupon(storeId, userId, issuedLoader)
     }
 
+    /** 유저 존재 여부를 검증한 뒤 발급 캐시를 원자적으로 선점합니다. 이미 발급된 경우 false를 반환합니다. */
+    @Transactional(readOnly = true)
+    fun verifyUserAndReserveCouponIssue(
+        storeId: UUID,
+        userId: UUID,
+        userLoader: () -> AppUserEntity,
+        issuedLoader: () -> Boolean,
+    ): Boolean {
+        verifyUserExistsWithCache(userId, userLoader)
+        return couponRedisCoordinator.loadWithShortLock(
+            lockKey = couponRedisCoordinator.couponIssueReservationLockKey(storeId, userId),
+            readCached = {
+                when (redisTemplate.opsForValue().get(couponIssuedCacheKey(storeId, userId))) {
+                    ISSUED_CACHE_VALUE -> false
+                    else -> null
+                }
+            },
+            loadAndCache = {
+                val hasIssuedCoupon = issuedLoader()
+                redisTemplate.opsForValue().set(couponIssuedCacheKey(storeId, userId), ISSUED_CACHE_VALUE, cacheTtlWithJitter())
+                !hasIssuedCoupon
+            },
+        )
+    }
+
     fun markCouponIssued(
         storeId: UUID,
         userId: UUID,
@@ -88,7 +113,7 @@ class CouponIssueCacheAsideStore(
         storeId: UUID,
         userId: UUID,
     ) {
-        redisTemplate.opsForValue().set(couponIssuedCacheKey(storeId, userId), NOT_ISSUED_CACHE_VALUE, cacheTtlWithJitter())
+        redisTemplate.delete(couponIssuedCacheKey(storeId, userId))
     }
 
     private fun cacheTtlWithJitter(): Duration = Duration.ofSeconds(ThreadLocalRandom.current().nextLong(600, 661))

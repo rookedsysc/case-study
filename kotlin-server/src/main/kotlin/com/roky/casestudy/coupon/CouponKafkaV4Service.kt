@@ -19,19 +19,19 @@ class CouponKafkaV4Service(
     fun issueCoupon(request: IssueCouponRequest): CouponResponse {
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
-        var shouldRollbackStock = false
-        var shouldUnmarkIssued = false
+        var isStockDecreased = false
+        var isReserved = false
 
         try {
             val store = couponKafkaV4StageService.loadStoreSnapshot(storeId)
 
-            shouldRollbackStock = couponKafkaV4StageService.decreaseRemainingStock(storeId, store)
-            if (!shouldRollbackStock) {
+            isStockDecreased = couponKafkaV4StageService.decreaseRemainingStock(storeId, store)
+            if (!isStockDecreased) {
                 throw CouponLimitExceededException(storeId)
             }
 
-            val isDuplicate = couponKafkaV4StageService.verifyDuplicateCoupon(storeId, userId)
-            if (isDuplicate) {
+            isReserved = couponKafkaV4StageService.reserveCouponIssue(storeId, userId)
+            if (!isReserved) {
                 throw DuplicateCouponException(storeId, userId)
             }
 
@@ -39,8 +39,6 @@ class CouponKafkaV4Service(
             val issuedAt = Instant.now()
 
             couponKafkaV4StageService.publishCouponIssue(storeId, userId, couponId, issuedAt)
-            couponKafkaV4StageService.markCouponIssued(storeId, userId)
-            shouldUnmarkIssued = true
 
             return CouponResponse(
                 id = couponId,
@@ -49,16 +47,16 @@ class CouponKafkaV4Service(
                 issuedAt = issuedAt,
             )
         } catch (e: RuntimeException) {
-            if (shouldUnmarkIssued) {
+            if (isReserved) {
                 couponKafkaV4StageService.unmarkCouponIssued(storeId, userId)
             }
-            rollbackStockIfNeeded(shouldRollbackStock, storeId)
+            rollbackStockIfNeeded(isStockDecreased, storeId)
             throw e
         }
     }
 
-    private fun rollbackStockIfNeeded(shouldRollbackStock: Boolean, storeId: UUID) {
-        if (shouldRollbackStock) {
+    private fun rollbackStockIfNeeded(isStockDecreased: Boolean, storeId: UUID) {
+        if (isStockDecreased) {
             couponRedisCoordinator.rollbackStock(storeId)
         }
     }

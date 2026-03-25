@@ -1,4 +1,4 @@
-import { createCouponLoadTest } from "./coupon-kafka-load-common.js";
+import { createCouponLoadTest } from "./coupon-load-common.js";
 
 const couponPessimisticLockLoadTest = createCouponLoadTest({
   scenarioName: "coupon_issue_only_pessimistic_lock",

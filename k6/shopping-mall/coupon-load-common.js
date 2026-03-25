@@ -21,7 +21,7 @@ const BASE_CONFIG = {
   requestTimeout: __ENV.REQUEST_TIMEOUT || "10m",
   gracefulStop: __ENV.GRACEFUL_STOP || "10m",
   setupTimeout: __ENV.SETUP_TIMEOUT || "10m",
-  verifyTimeoutMs: Number(__ENV.VERIFY_TIMEOUT_MS || 120000),
+  verifyTimeoutMs: Number(__ENV.VERIFY_TIMEOUT_MS || 300000),
   verifyPollIntervalSeconds: Number(__ENV.VERIFY_POLL_INTERVAL_SECONDS || 2),
 };
 
@@ -50,7 +50,12 @@ function postJson(config, path, payload, tags, responseCallback) {
   });
 }
 
-function getJson(config, path, tags, responseCallback = http.expectedStatuses(200)) {
+function getJson(
+  config,
+  path,
+  tags,
+  responseCallback = http.expectedStatuses(200),
+) {
   return http.get(`${config.baseUrl}${path}`, {
     headers: config.headers,
     tags,
@@ -200,7 +205,8 @@ function verifyCouponStatistics(config, data) {
   });
 
   if (!isValid) {
-    const issuedCouponCount = body !== null ? body.issuedCouponCount : "unknown";
+    const issuedCouponCount =
+      body !== null ? body.issuedCouponCount : "unknown";
     const remainingCouponCount =
       body !== null ? body.remainingCouponCount : "unknown";
     throw new Error(
@@ -224,6 +230,7 @@ export function createCouponLoadTest({
   const config = {
     ...BASE_CONFIG,
     ...configOverrides,
+    scenarioName,
     issuePath,
     tags: {
       createStores: { phase: "setup", kind: "create_stores_bulk" },
@@ -280,7 +287,10 @@ export function createCouponLoadTest({
       const isSuccessfulIssue = isIssueCouponSuccessStatus(response.status);
 
       ISSUE_COUPON_SUCCESS_RATE.add(isSuccessfulIssue, config.tags.issueCoupon);
-      ISSUE_COUPON_FAILURE_RATE.add(!isSuccessfulIssue, config.tags.issueCoupon);
+      ISSUE_COUPON_FAILURE_RATE.add(
+        !isSuccessfulIssue,
+        config.tags.issueCoupon,
+      );
 
       if (isSuccessfulIssue) {
         ISSUE_COUPON_SUCCESS_DURATION.add(

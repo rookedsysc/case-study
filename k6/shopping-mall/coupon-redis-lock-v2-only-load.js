@@ -1,4 +1,4 @@
-import { createCouponLoadTest } from "./coupon-kafka-load-common.js";
+import { createCouponLoadTest } from "./coupon-load-common.js";
 
 const couponRedisLockV2LoadTest = createCouponLoadTest({
   scenarioName: "coupon_issue_only_redis_lock_v2",

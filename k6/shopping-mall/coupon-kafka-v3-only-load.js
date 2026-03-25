@@ -1,4 +1,4 @@
-import { createCouponKafkaLoadTest } from "./coupon-kafka-load-common.js";
+import { createCouponKafkaLoadTest } from "./coupon-load-common.js";
 
 const couponKafkaV3LoadTest = createCouponKafkaLoadTest({
   version: "v3",

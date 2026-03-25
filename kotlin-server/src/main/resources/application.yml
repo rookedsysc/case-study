@@ -66,15 +66,22 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: com.roky.casestudy.coupon.dto
-        max.poll.records: 10
+        max.poll.records: 100
     listener:
-      concurrency: 1
+      concurrency: 4
 
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redispassword}
+
+coupon:
+  kafka:
+    issue:
+      topic-partitions: 8
+      topic-replication-factor: 1
+      producer-shard-count: 8
 
 server:
   port: ${APP_PORT:8080}

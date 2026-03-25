@@ -1,6 +1,8 @@
 package com.roky.casestudy.config
 
+import com.roky.casestudy.coupon.CouponIssueKafkaProducer
 import com.roky.casestudy.coupon.dto.CouponIssueEvent
+import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -15,6 +17,8 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaProducerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.core.ProducerFactory
+import org.springframework.kafka.listener.ContainerProperties
+import org.springframework.kafka.config.TopicBuilder
 import org.springframework.kafka.support.serializer.JsonDeserializer
 import org.springframework.kafka.support.serializer.JsonSerializer
 
@@ -27,7 +31,17 @@ class KafkaConfig(
     @Value("\${spring.kafka.listener.concurrency:1}") private val listenerConcurrency: Int,
     @Value("\${spring.kafka.consumer.properties.spring.json.trusted.packages:com.roky.casestudy.coupon.dto}")
     private val trustedPackages: String,
+    @Value("\${coupon.kafka.issue.topic-partitions:8}") private val couponIssueTopicPartitions: Int,
+    @Value("\${coupon.kafka.issue.topic-replication-factor:1}") private val couponIssueTopicReplicationFactor: Int,
 ) {
+    @Bean
+    fun couponIssueTopic(): NewTopic =
+        TopicBuilder
+            .name(CouponIssueKafkaProducer.TOPIC)
+            .partitions(couponIssueTopicPartitions.coerceAtLeast(1))
+            .replicas(couponIssueTopicReplicationFactor.coerceAtLeast(1))
+            .build()
+
     @Bean
     fun couponIssueProducerFactory(): ProducerFactory<String, CouponIssueEvent> =
         DefaultKafkaProducerFactory(
@@ -64,6 +78,8 @@ class KafkaConfig(
         val containerFactory = ConcurrentKafkaListenerContainerFactory<String, CouponIssueEvent>()
         containerFactory.setConsumerFactory(couponIssueConsumerFactory)
         containerFactory.setConcurrency(listenerConcurrency)
+        containerFactory.setBatchListener(true)
+        containerFactory.containerProperties.ackMode = ContainerProperties.AckMode.BATCH
         return containerFactory
     }
 }

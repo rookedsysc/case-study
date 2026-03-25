@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component
 /**
  * Kafka 쿠폰 발행 이벤트를 소비하여 DB에 저장합니다.
  *
- * 스로틀링은 application.yml의 max.poll.records(10)와 concurrency(1)로 제어합니다.
+ * 스로틀링은 application.yml의 max.poll.records와 concurrency로 제어합니다.
  * 중복 저장 시 신규 발급이 아니므로 재고만 복구하고 issued 캐시는 유지합니다.
  */
 @Component
@@ -25,28 +25,52 @@ class CouponIssueKafkaConsumer(
     private val log = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(topics = [CouponIssueKafkaProducer.TOPIC], groupId = "coupon-issue-consumer")
-    fun consume(event: CouponIssueEvent) {
+    fun consume(events: List<CouponIssueEvent>) {
+        if (events.isEmpty()) {
+            return
+        }
+
         try {
-            couponRepository.save(
-                CouponEntity(
-                    id = event.couponId,
-                    store = storeRepository.getReferenceById(event.storeId),
-                    user = appUserRepository.getReferenceById(event.userId),
-                    issuedAt = event.issuedAt,
-                ),
-            )
+            couponRepository.saveAllAndFlush(events.map(::toCouponEntity))
+        } catch (_: DataIntegrityViolationException) {
+            events.forEach(::persistIndividually)
+        } catch (e: Exception) {
+            events.forEach { event ->
+                handlePersistenceFailure(event, e)
+            }
+        }
+    }
+
+    private fun persistIndividually(event: CouponIssueEvent) {
+        try {
+            couponRepository.saveAndFlush(toCouponEntity(event))
         } catch (_: DataIntegrityViolationException) {
             log.warn("쿠폰 중복 저장 무시: storeId={}, userId={}", event.storeId, event.userId)
         } catch (e: Exception) {
-            log.error(
-                "쿠폰 저장 실패: couponId={}, storeId={}, userId={}",
-                event.couponId,
-                event.storeId,
-                event.userId,
-                e,
-            )
-            couponIssueCacheAsideStore.unmarkCouponIssued(event.storeId, event.userId)
-            couponRedisCoordinator.rollbackStock(event.storeId)
+            handlePersistenceFailure(event, e)
         }
     }
+
+    private fun handlePersistenceFailure(
+        event: CouponIssueEvent,
+        exception: Exception,
+    ) {
+        log.error(
+            "쿠폰 저장 실패: couponId={}, storeId={}, userId={}",
+            event.couponId,
+            event.storeId,
+            event.userId,
+            exception,
+        )
+        couponIssueCacheAsideStore.unmarkCouponIssued(event.storeId, event.userId)
+        couponRedisCoordinator.rollbackStock(event.storeId)
+    }
+
+    private fun toCouponEntity(event: CouponIssueEvent): CouponEntity =
+        CouponEntity(
+            id = event.couponId,
+            store = storeRepository.getReferenceById(event.storeId),
+            user = appUserRepository.getReferenceById(event.userId),
+            issuedAt = event.issuedAt,
+        )
 }

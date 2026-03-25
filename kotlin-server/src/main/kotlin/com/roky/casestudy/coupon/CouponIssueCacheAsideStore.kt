@@ -14,6 +14,7 @@ class CouponIssueCacheAsideStore(
     private val redisTemplate: StringRedisTemplate,
     private val couponRedisCoordinator: CouponRedisCoordinator,
 ) {
+    @Transactional(readOnly = true)
     fun getStoreSnapshotWithShortLock(
         storeId: UUID,
         loader: () -> StoreEntity,

@@ -123,6 +123,7 @@ class CouponRedisCoordinator(
 
     private fun stockKey(storeId: UUID): String = "coupon:stock:remaining:$storeId"
 
+    // 이건 readOnly 걸면 Replica Lag 발생할 수 있음
     private fun initializeRemainingStockIfAbsent(
         storeId: UUID,
         eventTotalCount: Long,

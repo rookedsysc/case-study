@@ -5,6 +5,28 @@
   "timezone": "browser",
   "refresh": "5s",
   "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "serviceName",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "definition": "label_values(service_name)",
+        "query": "label_values(service_name)",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true,
+        "multi": true,
+        "refresh": 1
+      },
+      {
+        "name": "logQuery",
+        "type": "textbox",
+        "label": "Log Search",
+        "query": "",
+        "current": { "text": "", "value": "" }
+      }
+    ]
+  },
   "panels": [
     {
       "id": 1,
@@ -14,7 +36,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(rate({service_name=~\".+\"}[1m])) by (detected_level)",
+          "expr": "sum(rate({service_name=~\"${serviceName:regex}\"}[1m])) by (detected_level)",
           "legendFormat": "{{detected_level}}"
         }
       ],
@@ -30,7 +52,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(rate({service_name=~\".+\"} |~ \"(?i)(error|exception|fail)\" [5m]))",
+          "expr": "sum(rate({service_name=~\"${serviceName:regex}\"} |~ \"(?i)(error|exception|fail)\" [5m]))",
           "legendFormat": "error logs/s"
         }
       ],
@@ -46,7 +68,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "absent_over_time({service_name=~\".+\"}[5m])",
+          "expr": "absent_over_time({service_name=~\"${serviceName:regex}\"}[5m])",
           "legendFormat": "absent"
         }
       ],
@@ -77,7 +99,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service_name=~\".+\"} |~ \"(?i)(error|exception|fail)\"",
+          "expr": "{service_name=~\"${serviceName:regex}\"} |~ \"(?i)(error|exception|fail)\" |~ \"(?i).*${logQuery:regex}.*\"",
           "legendFormat": ""
         }
       ]
@@ -97,12 +119,12 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service_name=~\".+\"}",
+          "expr": "{service_name=~\"${serviceName:regex}\"} |~ \"(?i).*${logQuery:regex}.*\"",
           "legendFormat": ""
         }
       ]
     }
   ],
   "schemaVersion": 38,
-  "version": 2
+  "version": 3
 }

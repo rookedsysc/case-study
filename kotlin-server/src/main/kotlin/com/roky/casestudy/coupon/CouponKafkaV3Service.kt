@@ -6,7 +6,6 @@ import com.roky.casestudy.coupon.dto.IssueCouponRequest
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import com.roky.casestudy.store.StoreRepository
-import com.roky.casestudy.user.AppUserRepository
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
@@ -18,7 +17,6 @@ class CouponKafkaV3Service(
     private val couponRedisCoordinator: CouponRedisCoordinator,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
     private val storeRepository: StoreRepository,
-    private val appUserRepository: AppUserRepository,
     private val couponIssueKafkaProducer: CouponIssueKafkaProducer,
 ) {
     /** 재고 감소와 중복 검증은 동기 처리하고, DB 저장만 Kafka로 비동기 발행합니다. */
@@ -37,7 +35,7 @@ class CouponKafkaV3Service(
                 }
 
             isStockDecreased =
-                couponRedisCoordinator.decreaseRemainingStock(
+                couponRedisCoordinator.decreaseRemainingCoupon(
                     storeId = store.storeId,
                     eventTotalCount = store.eventTotalCount,
                     issuedCountLoader = { couponRepository.countByStoreId(storeId) },
@@ -47,15 +45,9 @@ class CouponKafkaV3Service(
             }
 
             isReserved =
-                couponIssueCacheAsideStore.verifyUserAndReserveCouponIssue(
+                couponIssueCacheAsideStore.reserveCouponIssue(
                     storeId = storeId,
                     userId = userId,
-                    userLoader = {
-                        appUserRepository
-                            .findById(userId)
-                            .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
-                    },
-                    issuedLoader = { couponRepository.existsByStoreIdAndUserId(storeId, userId) },
                 )
             if (!isReserved) {
                 throw DuplicateCouponException(storeId, userId)

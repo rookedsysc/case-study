@@ -2,7 +2,6 @@ package com.roky.casestudy.coupon
 
 import com.roky.casestudy.coupon.dto.CouponIssueEvent
 import com.roky.casestudy.store.StoreRepository
-import com.roky.casestudy.user.AppUserRepository
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.kafka.annotation.KafkaListener
@@ -18,7 +17,6 @@ import org.springframework.stereotype.Component
 class CouponIssueKafkaConsumer(
     private val couponRepository: CouponRepository,
     private val storeRepository: StoreRepository,
-    private val appUserRepository: AppUserRepository,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
     private val couponRedisCoordinator: CouponRedisCoordinator,
 ) {
@@ -70,7 +68,7 @@ class CouponIssueKafkaConsumer(
         CouponEntity(
             id = event.couponId,
             store = storeRepository.getReferenceById(event.storeId),
-            user = appUserRepository.getReferenceById(event.userId),
+            userId = event.userId,
             issuedAt = event.issuedAt,
         )
 }

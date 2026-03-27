@@ -5,7 +5,6 @@ import com.roky.casestudy.coupon.dto.IssueCouponRequest
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import com.roky.casestudy.store.StoreRepository
-import com.roky.casestudy.user.AppUserRepository
 import org.springframework.stereotype.Service
 
 @Service
@@ -15,7 +14,6 @@ class CouponRedisLockV2Service(
     private val couponRedisCoordinator: CouponRedisCoordinator,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
     private val storeRepository: StoreRepository,
-    private val appUserRepository: AppUserRepository,
 ) {
     /** Redis 락과 cache-aside 기반으로 쿠폰을 발행합니다. */
     fun issueCoupon(request: IssueCouponRequest): CouponResponse {
@@ -32,7 +30,7 @@ class CouponRedisLockV2Service(
                 }
 
             shouldRollbackStock =
-                couponRedisCoordinator.decreaseRemainingStock(
+                couponRedisCoordinator.decreaseRemainingCoupon(
                     storeId = store.storeId,
                     eventTotalCount = store.eventTotalCount,
                     issuedCountLoader = { couponRepository.countByStoreId(storeId) },
@@ -42,15 +40,9 @@ class CouponRedisLockV2Service(
             }
 
             val isDuplicate =
-                couponIssueCacheAsideStore.verifyUserAndCheckDuplicateCoupon(
+                couponIssueCacheAsideStore.reserveCouponIssue(
                     storeId = storeId,
                     userId = userId,
-                    userLoader = {
-                        appUserRepository
-                            .findById(userId)
-                            .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
-                    },
-                    issuedLoader = { couponRepository.existsByStoreIdAndUserId(storeId, userId) },
                 )
             if (isDuplicate) {
                 throw DuplicateCouponException(storeId, userId)

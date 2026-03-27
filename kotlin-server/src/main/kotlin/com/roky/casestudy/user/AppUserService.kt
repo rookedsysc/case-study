@@ -10,6 +10,7 @@ import java.util.UUID
 @Service
 class AppUserService(
     private val appUserRepository: AppUserRepository,
+    private val appUserRedisSetStore: AppUserRedisSetStore,
 ) {
     /**
      * 유저를 count개 일괄 생성하고 생성된 ID 목록을 반환합니다.
@@ -21,7 +22,9 @@ class AppUserService(
     fun createUsersBulk(count: Int): BulkCreateAppUsersResponse {
         val users = (1..count).map { AppUserEntity(name = "bulk_user_${UUID.randomUUID()}") }
         val savedUsers = appUserRepository.saveAll(users)
-        return BulkCreateAppUsersResponse(ids = savedUsers.map { it.id })
+        val savedUserIds = savedUsers.map { it.id }
+        appUserRedisSetStore.addUsers(savedUserIds)
+        return BulkCreateAppUsersResponse(ids = savedUserIds)
     }
 
     /**
@@ -35,6 +38,7 @@ class AppUserService(
     fun getUserIds(page: Int, size: Int): AppUserIdsResponse {
         val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "createdAt"))
         val userIds = appUserRepository.findAll(pageable).content.map { it.id }
+        appUserRedisSetStore.addUsers(userIds)
         return AppUserIdsResponse(ids = userIds)
     }
 }

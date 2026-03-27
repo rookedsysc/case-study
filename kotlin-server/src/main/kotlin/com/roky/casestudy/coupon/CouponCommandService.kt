@@ -1,7 +1,6 @@
 package com.roky.casestudy.coupon
 
 import com.roky.casestudy.store.StoreRepository
-import com.roky.casestudy.user.AppUserRepository
 import java.util.UUID
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -12,7 +11,6 @@ class CouponCommandService(
     private val couponRepository: CouponRepository,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
     private val storeRepository: StoreRepository,
-    private val appUserRepository: AppUserRepository,
 ) {
     /**
      * 쿠폰을 저장하고 발급 캐시를 갱신합니다.
@@ -24,7 +22,7 @@ class CouponCommandService(
             couponRepository.save(
                 CouponEntity(
                     store = storeRepository.getReferenceById(storeId),
-                    user = appUserRepository.getReferenceById(userId),
+                    userId = userId,
                 ),
             )
         couponIssueCacheAsideStore.markCouponIssued(storeId, userId)

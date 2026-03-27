@@ -1,7 +1,6 @@
 package com.roky.casestudy.coupon
 
 import com.roky.casestudy.store.StoreEntity
-import com.roky.casestudy.user.AppUserEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
@@ -24,9 +23,8 @@ class CouponEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", nullable = false)
     val store: StoreEntity,
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    val user: AppUserEntity,
+    @Column(name = "user_id", nullable = false)
+    val userId: UUID,
     @Column(nullable = false, updatable = false)
     val issuedAt: Instant = Instant.now(),
 )

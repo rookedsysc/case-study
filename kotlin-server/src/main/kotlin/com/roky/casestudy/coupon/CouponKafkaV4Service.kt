@@ -25,7 +25,7 @@ class CouponKafkaV4Service(
         try {
             val store = couponKafkaV4StageService.loadStoreSnapshot(storeId)
 
-            isStockDecreased = couponKafkaV4StageService.decreaseRemainingStock(storeId, store)
+            isStockDecreased = couponKafkaV4StageService.decreaseRemainingCoupon(storeId, store)
             if (!isStockDecreased) {
                 throw CouponLimitExceededException(storeId)
             }

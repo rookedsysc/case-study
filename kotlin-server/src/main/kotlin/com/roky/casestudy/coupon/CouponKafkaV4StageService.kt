@@ -2,7 +2,6 @@ package com.roky.casestudy.coupon
 
 import com.roky.casestudy.coupon.dto.CouponIssueEvent
 import com.roky.casestudy.store.StoreRepository
-import com.roky.casestudy.user.AppUserRepository
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
@@ -13,7 +12,6 @@ class CouponKafkaV4StageService(
     private val couponRedisCoordinator: CouponRedisCoordinator,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
     private val storeRepository: StoreRepository,
-    private val appUserRepository: AppUserRepository,
     private val couponIssueKafkaProducer: CouponIssueKafkaProducer,
 ) {
     @CouponIssueStageMetric(STORE_SNAPSHOT_STAGE)
@@ -25,11 +23,11 @@ class CouponKafkaV4StageService(
         }
 
     @CouponIssueStageMetric(STOCK_DECREASE_STAGE)
-    fun decreaseRemainingStock(
+    fun decreaseRemainingCoupon(
         storeId: UUID,
         store: CachedStoreSnapshot,
     ): Boolean =
-        couponRedisCoordinator.decreaseRemainingStock(
+        couponRedisCoordinator.decreaseRemainingCoupon(
             storeId = store.storeId,
             eventTotalCount = store.eventTotalCount,
             issuedCountLoader = { couponRepository.countByStoreId(storeId) },
@@ -40,15 +38,9 @@ class CouponKafkaV4StageService(
         storeId: UUID,
         userId: UUID,
     ): Boolean =
-        couponIssueCacheAsideStore.verifyUserAndReserveCouponIssue(
+        couponIssueCacheAsideStore.reserveCouponIssue(
             storeId = storeId,
             userId = userId,
-            userLoader = {
-                appUserRepository
-                    .findById(userId)
-                    .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
-            },
-            issuedLoader = { couponRepository.existsByStoreIdAndUserId(storeId, userId) },
         )
 
     @CouponIssueStageMetric(KAFKA_PUBLISH_STAGE)

@@ -5,7 +5,6 @@ import com.roky.casestudy.coupon.dto.IssueCouponRequest
 import com.roky.casestudy.coupon.exception.CouponLimitExceededException
 import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import com.roky.casestudy.store.StoreRepository
-import com.roky.casestudy.user.AppUserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -14,7 +13,6 @@ class CouponRedisLockService(
     private val couponRepository: CouponRepository,
     private val couponRedisCoordinator: CouponRedisCoordinator,
     private val storeRepository: StoreRepository,
-    private val appUserRepository: AppUserRepository,
 ) {
     /** Redis 락 기반으로 쿠폰을 발행합니다. */
     @CouponUserLock(userIdExpression = "#p0.userId")
@@ -30,17 +28,12 @@ class CouponRedisLockService(
                     .findById(storeId)
                     .orElseThrow { NoSuchElementException("상점을 찾을 수 없습니다: $storeId") }
 
-            val user =
-                appUserRepository
-                    .findById(userId)
-                    .orElseThrow { NoSuchElementException("유저를 찾을 수 없습니다: $userId") }
-
             if (couponRepository.existsByStoreIdAndUserId(storeId, userId)) {
                 throw DuplicateCouponException(storeId, userId)
             }
 
             stockDecreased =
-                couponRedisCoordinator.decreaseRemainingStock(
+                couponRedisCoordinator.decreaseRemainingCoupon(
                     storeId = storeId,
                     eventTotalCount = store.eventTotalCount,
                     issuedCountLoader = { couponRepository.countByStoreId(storeId) },
@@ -49,7 +42,7 @@ class CouponRedisLockService(
                 throw CouponLimitExceededException(storeId)
             }
 
-            val coupon = CouponEntity(store = store, user = user)
+            val coupon = CouponEntity(store = store, userId = userId)
             return CouponMapper.toResponse(couponRepository.save(coupon))
         } catch (e: RuntimeException) {
             if (stockDecreased) {

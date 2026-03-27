@@ -89,39 +89,27 @@ class CouponRedisCoordinator(
     }
 
     /** Lua 스크립트로 재고를 원자적으로 감소시킵니다. 재고가 0이면 false를 반환합니다. */
-    fun decreaseRemainingStock(
+    fun decreaseRemainingCoupon(
         storeId: UUID,
         eventTotalCount: Long,
         issuedCountLoader: () -> Long,
     ): Boolean {
+        val result = decreaseStock(storeId)
+        if (result != STOCK_KEY_MISSING_RESULT) {
+            return result == STOCK_DECREASED_RESULT
+        }
+
         initializeRemainingStockIfAbsent(storeId, eventTotalCount, issuedCountLoader)
-        val result = redissonClient.script.eval<Long>(
+        return decreaseStock(storeId) == STOCK_DECREASED_RESULT
+    }
+
+    private fun decreaseStock(storeId: UUID): Long =
+        redissonClient.script.eval<Long>(
             RScript.Mode.READ_WRITE,
             decreaseStockScript,
             RScript.ReturnType.INTEGER,
             listOf(stockKey(storeId)),
         )
-        return result == 1L
-    }
-
-    fun rollbackStock(storeId: UUID) {
-        redissonClient.getAtomicLong(stockKey(storeId)).incrementAndGet()
-    }
-
-    fun storeSnapshotLoadLockKey(storeId: UUID): String = "coupon:lock:store-snapshot:$storeId"
-
-    fun stockInitializationLockKey(storeId: UUID): String = "coupon:lock:stock-init:$storeId"
-
-    fun userLoadLockKey(userId: UUID): String = "coupon:lock:user-load:$userId"
-
-    fun couponIssueReservationLockKey(
-        storeId: UUID,
-        userId: UUID,
-    ): String = "coupon:lock:issued-reservation:$storeId:$userId"
-
-    private fun userLockKey(userId: UUID): String = "coupon:lock:user:$userId"
-
-    private fun stockKey(storeId: UUID): String = "coupon:stock:remaining:$storeId"
 
     // 이건 readOnly 걸면 Replica Lag 발생할 수 있음
     private fun initializeRemainingStockIfAbsent(
@@ -140,4 +128,22 @@ class CouponRedisCoordinator(
             },
         )
     }
+
+    companion object {
+        private const val STOCK_KEY_MISSING_RESULT = -1L
+        private const val STOCK_DECREASED_RESULT = 1L
+    }
+
+    fun rollbackStock(storeId: UUID) {
+        redissonClient.getAtomicLong(stockKey(storeId)).incrementAndGet()
+    }
+
+    fun storeSnapshotLoadLockKey(storeId: UUID): String = "coupon:lock:store-snapshot:$storeId"
+
+    fun stockInitializationLockKey(storeId: UUID): String = "coupon:lock:stock-init:$storeId"
+
+    private fun userLockKey(userId: UUID): String = "coupon:lock:user:$userId"
+
+    private fun stockKey(storeId: UUID): String = "coupon:stock:remaining:$storeId"
+
 }

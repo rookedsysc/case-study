@@ -20,13 +20,13 @@ interface CouponRepository : JpaRepository<CouponEntity, UUID> {
     @Query(
         """
         select new com.roky.casestudy.coupon.dto.CouponStoreTopUserResponse(
-            c.user.id,
+            c.userId,
             count(c.id)
         )
         from CouponEntity c
         where c.store.id = :storeId
-        group by c.user.id
-        order by count(c.id) desc, c.user.id asc
+        group by c.userId
+        order by count(c.id) desc, c.userId asc
         """,
     )
     fun findTopIssuedUsersByStoreId(

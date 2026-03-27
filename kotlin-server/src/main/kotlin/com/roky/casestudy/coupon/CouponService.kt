@@ -54,7 +54,7 @@ class CouponService(
             throw CouponLimitExceededException(storeId)
         }
 
-        val coupon = CouponEntity(store = store, user = user)
+        val coupon = CouponEntity(store = store, userId = userId)
         return CouponMapper.toResponse(couponRepository.save(coupon))
     }
 

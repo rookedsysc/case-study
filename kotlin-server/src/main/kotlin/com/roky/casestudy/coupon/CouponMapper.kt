@@ -7,7 +7,7 @@ object CouponMapper {
         CouponResponse(
             id = entity.id,
             storeId = entity.store.id,
-            userId = entity.user.id,
+            userId = entity.userId,
             issuedAt = entity.issuedAt,
         )
 }

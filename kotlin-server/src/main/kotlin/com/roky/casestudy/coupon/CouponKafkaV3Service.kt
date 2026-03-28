@@ -16,6 +16,7 @@ class CouponKafkaV3Service(
     private val couponRepository: CouponRepository,
     private val couponRedisCoordinator: CouponRedisCoordinator,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
+    private val couponIssueCompensationService: CouponIssueCompensationService,
     private val storeRepository: StoreRepository,
     private val couponIssueKafkaProducer: CouponIssueKafkaProducer,
 ) {
@@ -23,6 +24,8 @@ class CouponKafkaV3Service(
     fun issueCoupon(request: IssueCouponRequest): CouponResponse {
         val storeId = requireNotNull(request.storeId) { "storeId는 필수입니다" }
         val userId = requireNotNull(request.userId) { "userId는 필수입니다" }
+        val couponId = UUID.randomUUID()
+        val issuedAt = Instant.now()
         var isStockDecreased = false
         var isReserved = false
 
@@ -52,32 +55,27 @@ class CouponKafkaV3Service(
             if (!isReserved) {
                 throw DuplicateCouponException(storeId, userId)
             }
+        } catch (e: RuntimeException) {
+            couponIssueCompensationService.rollbackIssueAttempt(storeId, userId, isReserved, isStockDecreased)
+            throw e
+        }
 
-            val couponId = UUID.randomUUID()
-            val issuedAt = Instant.now()
-
-            couponIssueKafkaProducer.publishCouponIssue(
+        couponIssueKafkaProducer.publishCouponIssue(
+            event =
                 CouponIssueEvent(
                     couponId = couponId,
                     storeId = storeId,
                     userId = userId,
                     issuedAt = issuedAt,
                 ),
-            )
-            return CouponResponse(
-                id = couponId,
-                storeId = storeId,
-                userId = userId,
-                issuedAt = issuedAt,
-            )
-        } catch (e: RuntimeException) {
-            if (isReserved) {
-                couponIssueCacheAsideStore.unmarkCouponIssued(storeId, userId)
-            }
-            if (isStockDecreased) {
-                couponRedisCoordinator.rollbackStock(storeId)
-            }
-            throw e
-        }
+            onPublishFailure = { couponIssueCompensationService.rollbackReservedIssue(storeId, userId) },
+        )
+
+        return CouponResponse(
+            id = couponId,
+            storeId = storeId,
+            userId = userId,
+            issuedAt = issuedAt,
+        )
     }
 }

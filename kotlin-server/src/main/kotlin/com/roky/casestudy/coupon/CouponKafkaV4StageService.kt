@@ -10,6 +10,7 @@ import java.util.UUID
 class CouponKafkaV4StageService(
     private val couponRepository: CouponRepository,
     private val couponRedisCoordinator: CouponRedisCoordinator,
+    private val couponSoldOutLocalCache: CouponSoldOutLocalCache,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
     private val storeRepository: StoreRepository,
     private val couponIssueKafkaProducer: CouponIssueKafkaProducer,
@@ -26,12 +27,26 @@ class CouponKafkaV4StageService(
     fun decreaseRemainingCoupon(
         storeId: UUID,
         store: CachedStoreSnapshot,
-    ): Boolean =
-        couponRedisCoordinator.decreaseRemainingCoupon(
-            storeId = store.storeId,
-            eventTotalCount = store.eventTotalCount,
-            issuedCountLoader = { couponRepository.countByStoreId(storeId) },
-        )
+    ): Boolean {
+        if (couponSoldOutLocalCache.isSoldOut(storeId)) {
+            return false
+        }
+
+        val isStockDecreased =
+            couponRedisCoordinator.decreaseRemainingCoupon(
+                storeId = store.storeId,
+                eventTotalCount = store.eventTotalCount,
+                issuedCountLoader = { couponRepository.countByStoreId(storeId) },
+            )
+
+        if (isStockDecreased) {
+            couponSoldOutLocalCache.evict(storeId)
+            return true
+        }
+
+        couponSoldOutLocalCache.markSoldOut(storeId)
+        return false
+    }
 
     @CouponIssueStageMetric(DUPLICATE_CHECK_STAGE)
     fun reserveCouponIssue(

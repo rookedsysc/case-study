@@ -19,6 +19,7 @@ class CouponIssueKafkaConsumer(
     private val storeRepository: StoreRepository,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
     private val couponRedisCoordinator: CouponRedisCoordinator,
+    private val couponSoldOutLocalCache: CouponSoldOutLocalCache,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -61,6 +62,7 @@ class CouponIssueKafkaConsumer(
             exception,
         )
         couponIssueCacheAsideStore.unmarkCouponIssued(event.storeId, event.userId)
+        couponSoldOutLocalCache.evict(event.storeId)
         couponRedisCoordinator.rollbackStock(event.storeId)
     }
 

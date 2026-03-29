@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit
 @Component
 class CouponRedisCoordinator(
     private val redissonClient: RedissonClient,
+    private val couponSoldOutLocalCache: CouponSoldOutLocalCache,
 ) {
     private val decreaseStockScript: String =
         ClassPathResource("scripts/decrease-stock.lua").inputStream.bufferedReader().readText()
@@ -94,13 +95,30 @@ class CouponRedisCoordinator(
         eventTotalCount: Long,
         issuedCountLoader: () -> Long,
     ): Boolean {
+        if (couponSoldOutLocalCache.isSoldOut(storeId)) {
+            return false
+        }
+
         val result = decreaseStock(storeId)
         if (result != STOCK_KEY_MISSING_RESULT) {
-            return result == STOCK_DECREASED_RESULT
+            return applyStockDecreaseResultToLocalCache(storeId, result)
         }
 
         initializeRemainingStockIfAbsent(storeId, eventTotalCount, issuedCountLoader)
-        return decreaseStock(storeId) == STOCK_DECREASED_RESULT
+        return applyStockDecreaseResultToLocalCache(storeId, decreaseStock(storeId))
+    }
+
+    private fun applyStockDecreaseResultToLocalCache(
+        storeId: UUID,
+        result: Long,
+    ): Boolean {
+        if (result == STOCK_DECREASED_RESULT) {
+            couponSoldOutLocalCache.evict(storeId)
+            return true
+        }
+
+        couponSoldOutLocalCache.markSoldOut(storeId)
+        return false
     }
 
     private fun decreaseStock(storeId: UUID): Long =
@@ -135,6 +153,7 @@ class CouponRedisCoordinator(
     }
 
     fun rollbackStock(storeId: UUID) {
+        couponSoldOutLocalCache.evict(storeId)
         redissonClient.getAtomicLong(stockKey(storeId)).incrementAndGet()
     }
 

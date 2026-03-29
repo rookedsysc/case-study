@@ -13,6 +13,7 @@ import java.util.concurrent.ThreadLocalRandom
 class CouponIssueCacheAsideStore(
     private val redisTemplate: StringRedisTemplate,
     private val couponRedisCoordinator: CouponRedisCoordinator,
+    private val couponStoreSnapshotLocalCache: CouponStoreSnapshotLocalCache,
     private val transactionManager: PlatformTransactionManager,
 ) {
     private val readOnlyTransactionTemplate =
@@ -24,21 +25,20 @@ class CouponIssueCacheAsideStore(
         storeId: UUID,
         loader: () -> StoreEntity,
     ): CachedStoreSnapshot =
-        couponRedisCoordinator.loadWithShortLock(
-            lockKey = couponRedisCoordinator.storeSnapshotLoadLockKey(storeId),
-            readCached = { readStoreSnapshot(storeId) },
-            loadAndCache = {
-                val store = loadStoreSnapshot(loader)
-                val snapshot = CachedStoreSnapshot(storeId = store.id, eventTotalCount = store.eventTotalCount)
-                redisTemplate
-                    .opsForValue()
-                    .set(storeCacheKey(storeId), snapshot.eventTotalCount.toString(), cacheTtlWithJitter())
-                snapshot
-            },
-        )
-
-    fun hasIssuedCoupon(storeId: UUID, userId: UUID): Boolean =
-        redisTemplate.opsForSet().isMember(couponIssuedUsersKey(storeId), userId.toString()) == true
+        readLocalStoreSnapshot(storeId)
+            ?: couponRedisCoordinator.loadWithShortLock(
+                lockKey = couponRedisCoordinator.storeSnapshotLoadLockKey(storeId),
+                readCached = { readStoreSnapshot(storeId)?.also(couponStoreSnapshotLocalCache::put) },
+                loadAndCache = {
+                    val store = loadStoreSnapshot(loader)
+                    val snapshot = CachedStoreSnapshot(storeId = store.id, eventTotalCount = store.eventTotalCount)
+                    redisTemplate
+                        .opsForValue()
+                        .set(storeCacheKey(storeId), snapshot.eventTotalCount.toString(), cacheTtlWithJitter())
+                    couponStoreSnapshotLocalCache.put(snapshot)
+                    snapshot
+                },
+            )
 
     /** 발급 유저 Set에 예약 마킹을 시도합니다. 이미 발급된 경우 false를 반환합니다. */
     fun reserveCouponIssue(
@@ -70,6 +70,8 @@ class CouponIssueCacheAsideStore(
         val cachedEventTotalCount = redisTemplate.opsForValue().get(storeCacheKey(storeId)) ?: return null
         return CachedStoreSnapshot(storeId = storeId, eventTotalCount = cachedEventTotalCount.toLong())
     }
+
+    private fun readLocalStoreSnapshot(storeId: UUID): CachedStoreSnapshot? = couponStoreSnapshotLocalCache.get(storeId)
 
     private fun storeCacheKey(storeId: UUID): String = "coupon:v2:store:event-total-count:$storeId"
 

@@ -101,14 +101,14 @@ class CouponRedisCoordinator(
 
         val result = decreaseStock(storeId)
         if (result != STOCK_KEY_MISSING_RESULT) {
-            return handleStockDecreaseResult(storeId, result)
+            return applyStockDecreaseResultToLocalCache(storeId, result)
         }
 
         initializeRemainingStockIfAbsent(storeId, eventTotalCount, issuedCountLoader)
-        return handleStockDecreaseResult(storeId, decreaseStock(storeId))
+        return applyStockDecreaseResultToLocalCache(storeId, decreaseStock(storeId))
     }
 
-    private fun handleStockDecreaseResult(
+    private fun applyStockDecreaseResultToLocalCache(
         storeId: UUID,
         result: Long,
     ): Boolean {

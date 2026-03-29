@@ -3,7 +3,8 @@ package com.roky.casestudy.coupon
 import com.roky.casestudy.store.StoreEntity
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
@@ -12,8 +13,13 @@ import java.util.concurrent.ThreadLocalRandom
 class CouponIssueCacheAsideStore(
     private val redisTemplate: StringRedisTemplate,
     private val couponRedisCoordinator: CouponRedisCoordinator,
+    private val transactionManager: PlatformTransactionManager,
 ) {
-    @Transactional(readOnly = true)
+    private val readOnlyTransactionTemplate =
+        TransactionTemplate(transactionManager).apply {
+            isReadOnly = true
+        }
+
     fun getStoreSnapshotWithShortLock(
         storeId: UUID,
         loader: () -> StoreEntity,
@@ -22,7 +28,7 @@ class CouponIssueCacheAsideStore(
             lockKey = couponRedisCoordinator.storeSnapshotLoadLockKey(storeId),
             readCached = { readStoreSnapshot(storeId) },
             loadAndCache = {
-                val store = loader()
+                val store = loadStoreSnapshot(loader)
                 val snapshot = CachedStoreSnapshot(storeId = store.id, eventTotalCount = store.eventTotalCount)
                 redisTemplate
                     .opsForValue()
@@ -56,6 +62,9 @@ class CouponIssueCacheAsideStore(
     }
 
     private fun cacheTtlWithJitter(): Duration = Duration.ofSeconds(ThreadLocalRandom.current().nextLong(600, 661))
+
+    private fun loadStoreSnapshot(loader: () -> StoreEntity): StoreEntity =
+        checkNotNull(readOnlyTransactionTemplate.execute { loader() })
 
     private fun readStoreSnapshot(storeId: UUID): CachedStoreSnapshot? {
         val cachedEventTotalCount = redisTemplate.opsForValue().get(storeCacheKey(storeId)) ?: return null

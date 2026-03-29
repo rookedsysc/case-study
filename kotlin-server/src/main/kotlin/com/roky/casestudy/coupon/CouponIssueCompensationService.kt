@@ -6,7 +6,6 @@ import java.util.UUID
 @Service
 class CouponIssueCompensationService(
     private val couponRedisCoordinator: CouponRedisCoordinator,
-    private val couponSoldOutLocalCache: CouponSoldOutLocalCache,
     private val couponIssueCacheAsideStore: CouponIssueCacheAsideStore,
 ) {
     fun rollbackIssueAttempt(
@@ -19,7 +18,6 @@ class CouponIssueCompensationService(
             couponIssueCacheAsideStore.unmarkCouponIssued(storeId, userId)
         }
         if (isStockDecreased) {
-            couponSoldOutLocalCache.evict(storeId)
             couponRedisCoordinator.rollbackStock(storeId)
         }
     }
@@ -29,7 +27,6 @@ class CouponIssueCompensationService(
         userId: UUID,
     ) {
         couponIssueCacheAsideStore.unmarkCouponIssued(storeId, userId)
-        couponSoldOutLocalCache.evict(storeId)
         couponRedisCoordinator.rollbackStock(storeId)
     }
 }

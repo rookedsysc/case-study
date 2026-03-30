@@ -51,26 +51,59 @@ docker compose up -d prometheus grafana
 k6 실행 예시:
 
 ```bash
-K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" k6 run -o experimental-prometheus-rw -e BASE_URL=http://localhost:38080 k6/shopping-mall/coupon-redis-lock-v2-only-load.js
+TEST_ID=$(date +%Y%m%d-%H%M%S)
+
+K6_PROMETHEUS_RW_PUSH_INTERVAL=10s \
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write \
+K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" \
+k6 run -o experimental-prometheus-rw \
+  --tag testid=${TEST_ID} \
+  -e BASE_URL=http://localhost:38080 \
+  k6/shopping-mall/coupon-redis-lock-v2-only-load.js
 ```
 
 - `BASE_URL`은 `.env`의 `NGINX_HOST_PORT` 기본값 기준으로 `http://localhost:38080`을 사용했다.
 - `K6_PROMETHEUS_RW_SERVER_URL`은 `.env`의 `PROMETHEUS_HOST_PORT` 기본값 기준으로 `http://localhost:39090/api/v1/write`를 사용해야 한다.
+- `K6_PROMETHEUS_RW_PUSH_INTERVAL`은 Remote Write flush 간격이다. 기본값 `5s`에서 `10s`로 올리면 Prometheus OOM을 방지할 수 있다.
 - 실행이 끝나면 `bash .claude/hooks/kanvibe-stop-hook.sh`까지 이어서 호출되므로 한 줄로 바로 확인하기 좋다.
 - 다른 스크립트를 실행할 때는 마지막 파일 경로만 바꾸면 된다.
 
 스크립트별 실행 예시:
 
 ```bash
-K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" k6 run -o experimental-prometheus-rw -e BASE_URL=http://localhost:38080 k6/shopping-mall/coupon-redis-lock-v2-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
+TEST_ID=$(date +%Y%m%d-%H%M%S)
+
+K6_PROMETHEUS_RW_PUSH_INTERVAL=10s \
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write \
+K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" \
+k6 run -o experimental-prometheus-rw \
+  --tag testid=${TEST_ID} \
+  -e BASE_URL=http://localhost:38080 \
+  k6/shopping-mall/coupon-redis-lock-v2-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
 ```
 
 ```bash
-K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" k6 run -o experimental-prometheus-rw -e BASE_URL=http://localhost:38080 k6/shopping-mall/coupon-redis-lock-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
+TEST_ID=$(date +%Y%m%d-%H%M%S)
+
+K6_PROMETHEUS_RW_PUSH_INTERVAL=10s \
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write \
+K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" \
+k6 run -o experimental-prometheus-rw \
+  --tag testid=${TEST_ID} \
+  -e BASE_URL=http://localhost:38080 \
+  k6/shopping-mall/coupon-redis-lock-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
 ```
 
 ```bash
-K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" k6 run -o experimental-prometheus-rw -e BASE_URL=http://localhost:38080 k6/shopping-mall/coupon-pessimistic-lock-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
+TEST_ID=$(date +%Y%m%d-%H%M%S)
+
+K6_PROMETHEUS_RW_PUSH_INTERVAL=10s \
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:39090/api/v1/write \
+K6_PROMETHEUS_RW_TREND_STATS="p(90),p(95),avg,max" \
+k6 run -o experimental-prometheus-rw \
+  --tag testid=${TEST_ID} \
+  -e BASE_URL=http://localhost:38080 \
+  k6/shopping-mall/coupon-pessimistic-lock-only-load.js; bash .claude/hooks/kanvibe-stop-hook.sh
 ```
 
 Grafana 확인 방법:

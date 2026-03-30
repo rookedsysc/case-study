@@ -1,6 +1,8 @@
 package com.roky.casestudy.coupon
 
 import com.roky.casestudy.coupon.dto.CouponIssueEvent
+import com.roky.casestudy.coupon.exception.CouponLimitExceededException
+import com.roky.casestudy.coupon.exception.DuplicateCouponException
 import com.roky.casestudy.store.StoreRepository
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
@@ -46,14 +48,16 @@ class CouponIssueKafkaV5Consumer(
             )
 
         if (!isStockDecreased) {
-            log.warn("재고 소진으로 쿠폰 발급 불가: storeId={}, userId={}", event.storeId, event.userId)
-            couponIssueCacheAsideStore.unmarkCouponIssued(event.storeId, event.userId)
-            return
+            throw CouponLimitExceededException(event.storeId)
         }
 
-        if (!couponIssueCacheAsideStore.reserveCouponIssue(event.storeId, event.userId)) {
-            log.info("이미 발급된 쿠폰 이벤트 무시: storeId={}, userId={}", event.storeId, event.userId)
-            return
+        val isReserved =
+            couponIssueCacheAsideStore.reserveCouponIssue(
+                storeId = event.storeId,
+                userId = event.userId,
+            )
+        if (!isReserved) {
+            throw DuplicateCouponException(event.storeId, event.userId)
         }
 
         try {
@@ -65,7 +69,6 @@ class CouponIssueKafkaV5Consumer(
                 event.storeId,
                 event.userId,
             )
-            couponRedisCoordinator.rollbackStock(event.storeId)
         } catch (e: Exception) {
             log.error(
                 "쿠폰 저장 실패: couponId={}, storeId={}, userId={}",

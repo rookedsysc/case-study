@@ -3,18 +3,72 @@ spring:
     name: case-study
 
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:casestudy}
-    username: ${MYSQL_USER:appuser}
-    password: ${MYSQL_PASSWORD:apppassword}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    source-only: ${MYSQL_SOURCE_ONLY:false}
+    source:
+      jdbc-url: jdbc:mysql://${MYSQL_SOURCE_HOST:${FLYWAY_HOST:localhost}}:${MYSQL_SOURCE_PORT:${FLYWAY_PORT:3306}}/${MYSQL_DATABASE:casestudy}
+      username: ${MYSQL_USER:appuser}
+      password: ${MYSQL_PASSWORD:apppassword}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+    write:
+      jdbc-url: jdbc:mysql://${MYSQL_WRITE_HOST:localhost}:${MYSQL_WRITE_PORT:6033}/${MYSQL_DATABASE:casestudy}
+      username: ${MYSQL_USER:appuser}
+      password: ${MYSQL_PASSWORD:apppassword}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+    read:
+      jdbc-url: jdbc:mysql://${MYSQL_READ_HOST:localhost}:${MYSQL_READ_PORT:6033}/${MYSQL_DATABASE:casestudy}
+      username: ${MYSQL_USER:appuser}
+      password: ${MYSQL_PASSWORD:apppassword}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
+        # saveAll() 호출 시 단일 multi-row INSERT로 처리해 bulk 생성 속도를 높인다
+        jdbc:
+          batch_size: 1000
+        order_inserts: true
+        order_updates: true
     open-in-view: false
+
+  flyway:
+    enabled: true
+    url: jdbc:mysql://${FLYWAY_HOST:localhost}:${FLYWAY_PORT:3306}/${MYSQL_DATABASE:casestudy}
+    user: ${MYSQL_USER:appuser}
+    password: ${MYSQL_PASSWORD:apppassword}
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: coupon-issue-consumer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.roky.casestudy.coupon.dto
+        max.poll.records: 100
+    listener:
+      concurrency: 4
 
   data:
     redis:
@@ -22,8 +76,15 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redispassword}
 
+coupon:
+  kafka:
+    issue:
+      topic-partitions: 8
+      topic-replication-factor: 1
+      producer-shard-count: 8
+
 server:
-  port: 8080
+  port: ${APP_PORT:8080}
 
 management:
   endpoints:
@@ -61,3 +122,13 @@ otel:
 logging:
   level:
     root: INFO
+    org.apache.kafka.clients.consumer.internals: WARN
+    org.springframework.kafka.listener.KafkaMessageListenerContainer: WARN
+    org.springframework.kafka.listener.ConsumerRebalanceListenerInvoker: WARN
+
+  tomcat:
+    # 인스턴스 3개 기준 총 1200 스레드 → 1000 VU 동시 요청 수용
+    threads:
+      max: 400
+      min-spare: 50
+    accept-count: 200

@@ -1,115 +1,112 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   nginx:
     image: nginx:alpine
     ports:
-      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_HOST_PORT:-80}:80"
+    environment:
+      - APP_PORT=${APP_PORT:-8080}
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/nginx-global.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - nginx-logs:/var/log/nginx
+    logging: *default-logging
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    sysctls:
+      net.core.somaxconn: 16384
     depends_on:
-      app-1:
-        condition: service_started
-      app-2:
-        condition: service_started
-      app-3:
-        condition: service_started
+      app:
+        condition: service_healthy
     deploy:
       resources:
         limits:
           cpus: 1
           memory: 1G
 
-  app-1:
+  app:
     build: ./kotlin-server
     expose:
       - "${APP_PORT:-8080}"
+    logging: *default-logging
     environment:
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - APP_PORT=${APP_PORT:-8080}
+      - JAVA_OPTS=-XX:+UseG1GC -Xms384m -Xmx512m -XX:ActiveProcessorCount=1 -XX:MaxDirectMemorySize=128m -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:gc*:stdout:time,uptime,level,tags
+      - MYSQL_HOST=${MYSQL_HOST:-proxysql}
+      - MYSQL_PORT=${MYSQL_PORT:-6033}
+      - MYSQL_WRITE_HOST=${MYSQL_WRITE_HOST:-proxysql}
+      - MYSQL_WRITE_PORT=${MYSQL_WRITE_PORT:-6033}
+      - MYSQL_READ_HOST=${MYSQL_READ_HOST:-proxysql}
+      - MYSQL_READ_PORT=${MYSQL_READ_PORT:-6033}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
       - MYSQL_USER=${MYSQL_USER:-appuser}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
-      - REDIS_HOST=redis
+      - FLYWAY_HOST=${FLYWAY_HOST:-mysql-source}
+      - FLYWAY_PORT=${FLYWAY_PORT:-3306}
+      - MYSQL_SOURCE_ONLY=${MYSQL_SOURCE_ONLY:-false}
+      - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
-      - OTEL_COLLECTOR_HOST=otel-collector
+      - OTEL_COLLECTOR_HOST=${OTEL_COLLECTOR_HOST:-otel-collector}
+      - OTEL_COLLECTOR_PORT=${OTEL_COLLECTOR_PORT:-4318}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+      - OTEL_LOGS_EXPORTER=otlp
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9093
+      - OTEL_SERVICE_NAME=case-study
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:-0.1}
+      - SERVER_TOMCAT_THREADS_MAX=${SERVER_TOMCAT_THREADS_MAX:-64}
+      - SERVER_TOMCAT_THREADS_MIN_SPARE=${SERVER_TOMCAT_THREADS_MIN_SPARE:-10}
+      - SERVER_TOMCAT_ACCEPT_COUNT=${SERVER_TOMCAT_ACCEPT_COUNT:-100}
+      - SPRING_DATASOURCE_SOURCE_MAXIMUM_POOL_SIZE=${SPRING_DATASOURCE_SOURCE_MAXIMUM_POOL_SIZE:-6}
+      - SPRING_DATASOURCE_SOURCE_MINIMUM_IDLE=${SPRING_DATASOURCE_SOURCE_MINIMUM_IDLE:-2}
+      - SPRING_DATASOURCE_WRITE_MAXIMUM_POOL_SIZE=${SPRING_DATASOURCE_WRITE_MAXIMUM_POOL_SIZE:-6}
+      - SPRING_DATASOURCE_WRITE_MINIMUM_IDLE=${SPRING_DATASOURCE_WRITE_MINIMUM_IDLE:-2}
+      - SPRING_DATASOURCE_READ_MAXIMUM_POOL_SIZE=${SPRING_DATASOURCE_READ_MAXIMUM_POOL_SIZE:-6}
+      - SPRING_DATASOURCE_READ_MINIMUM_IDLE=${SPRING_DATASOURCE_READ_MINIMUM_IDLE:-2}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
     depends_on:
-      mysql:
+      proxysql:
         condition: service_healthy
       redis:
         condition: service_started
+      kafka:
+        condition: service_healthy
       otel-collector:
         condition: service_started
     deploy:
+      replicas: 3
       resources:
         limits:
           cpus: 1
           memory: 1G
 
-  app-2:
-    build: ./kotlin-server
-    expose:
-      - "${APP_PORT:-8080}"
-    environment:
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=${MYSQL_PORT:-3306}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
-      - MYSQL_USER=${MYSQL_USER:-appuser}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
-      - REDIS_HOST=redis
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
-      - OTEL_COLLECTOR_HOST=otel-collector
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      otel-collector:
-        condition: service_started
-    deploy:
-      resources:
-        limits:
-          cpus: 1
-          memory: 1G
-
-  app-3:
-    build: ./kotlin-server
-    expose:
-      - "${APP_PORT:-8080}"
-    environment:
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=${MYSQL_PORT:-3306}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
-      - MYSQL_USER=${MYSQL_USER:-appuser}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
-      - REDIS_HOST=redis
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
-      - OTEL_COLLECTOR_HOST=otel-collector
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      otel-collector:
-        condition: service_started
-    deploy:
-      resources:
-        limits:
-          cpus: 1
-          memory: 1G
-
-  mysql:
+  mysql-source:
     image: mysql:8.4.8
+    logging: *default-logging
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
       - MYSQL_USER=${MYSQL_USER:-appuser}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "${MYSQL_SOURCE_HOST_PORT:-3306}:3306"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - mysql-source-data:/var/lib/mysql
+      - ./mysql/source/my.cnf:/etc/mysql/conf.d/replication.cnf:ro
+      - ./mysql/source/init-replication.sh:/docker-entrypoint-initdb.d/init-replication.sh:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -121,11 +118,108 @@ services:
           cpus: 1
           memory: 1G
 
+  mysql-replica:
+    image: mysql:8.4.8
+    logging: *default-logging
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-casestudy}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppassword}
+    ports:
+      - "${MYSQL_REPLICA_HOST_PORT:-3307}:3306"
+    volumes:
+      - mysql-replica-data:/var/lib/mysql
+      - ./mysql/replica/my.cnf:/etc/mysql/conf.d/replication.cnf:ro
+      - ./mysql/replica/init-replication.sh:/docker-entrypoint-initdb.d/init-replication.sh:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      mysql-source:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1G
+
+  proxysql:
+    image: proxysql/proxysql:2.7.1
+    logging: *default-logging
+    ports:
+      - "${PROXYSQL_HOST_PORT:-36033}:6033"
+      - "${PROXYSQL_ADMIN_HOST_PORT:-36032}:6032"
+    volumes:
+      - ./proxysql/proxysql.cnf:/etc/proxysql.cnf:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-P",
+          "6033",
+          "-u",
+          "appuser",
+          "-papppassword",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      mysql-source:
+        condition: service_healthy
+      mysql-replica:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 512M
+
+  kafka:
+    image: apache/kafka:latest
+    logging: *default-logging
+    ports:
+      - "${KAFKA_HOST_PORT:-39092}:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://localhost:9091,HOST://0.0.0.0:9092,DOCKER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://${KAFKA_ADVERTISED_HOST:-localhost}:${KAFKA_HOST_PORT:-39092},DOCKER://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,DOCKER:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9091
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_HEAP_OPTS: "-Xmx1g -Xms512m"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: 2G
+
   redis:
     image: redis:8.6-alpine
+    logging: *default-logging
     command: redis-server --requirepass ${REDIS_PASSWORD:-redispassword}
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     deploy:
@@ -134,10 +228,157 @@ services:
           cpus: 1
           memory: 1G
 
+  redis-cluster-node-1:
+    image: redis:8.6-alpine
+    logging: *default-logging
+    command:
+      - sh
+      - -c
+      - |
+        exec redis-server \
+          --port 6379 \
+          --requirepass ${REDIS_PASSWORD:-redispassword} \
+          --masterauth ${REDIS_PASSWORD:-redispassword} \
+          --cluster-enabled yes \
+          --cluster-config-file /data/nodes.conf \
+          --cluster-node-timeout 5000 \
+          --appendonly yes \
+          --protected-mode no
+    ports:
+      - "7001:6379"
+    volumes:
+      - redis-cluster-node-1-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1G
+
+  redis-cluster-node-2:
+    image: redis:8.6-alpine
+    logging: *default-logging
+    command:
+      - sh
+      - -c
+      - |
+        exec redis-server \
+          --port 6379 \
+          --requirepass ${REDIS_PASSWORD:-redispassword} \
+          --masterauth ${REDIS_PASSWORD:-redispassword} \
+          --cluster-enabled yes \
+          --cluster-config-file /data/nodes.conf \
+          --cluster-node-timeout 5000 \
+          --appendonly yes \
+          --protected-mode no
+    ports:
+      - "7002:6379"
+    volumes:
+      - redis-cluster-node-2-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1G
+
+  redis-cluster-node-3:
+    image: redis:8.6-alpine
+    logging: *default-logging
+    command:
+      - sh
+      - -c
+      - |
+        exec redis-server \
+          --port 6379 \
+          --requirepass ${REDIS_PASSWORD:-redispassword} \
+          --masterauth ${REDIS_PASSWORD:-redispassword} \
+          --cluster-enabled yes \
+          --cluster-config-file /data/nodes.conf \
+          --cluster-node-timeout 5000 \
+          --appendonly yes \
+          --protected-mode no
+    ports:
+      - "7003:6379"
+    volumes:
+      - redis-cluster-node-3-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1G
+
+  redis-cluster-init:
+    image: redis:8.6-alpine
+    logging: *default-logging
+    command:
+      - sh
+      - -c
+      - |
+        cluster_ok() {
+          redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-1 -p 6379 cluster info 2>/dev/null | grep -q "cluster_state:ok"
+        }
+
+        if cluster_ok; then
+          exit 0
+        fi
+
+        until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-1 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
+        until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-2 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
+        until redis-cli -a ${REDIS_PASSWORD:-redispassword} -h redis-cluster-node-3 -p 6379 ping >/dev/null 2>&1; do sleep 1; done
+
+        if cluster_ok; then
+          exit 0
+        fi
+
+        for node in redis-cluster-node-1 redis-cluster-node-2 redis-cluster-node-3; do
+          redis-cli -a ${REDIS_PASSWORD:-redispassword} -h "$${node}" -p 6379 cluster reset hard >/dev/null 2>&1 || true
+          redis-cli -a ${REDIS_PASSWORD:-redispassword} -h "$${node}" -p 6379 flushall >/dev/null 2>&1 || true
+        done
+
+        if yes yes | redis-cli --cluster create \
+          redis-cluster-node-1:6379 \
+          redis-cluster-node-2:6379 \
+          redis-cluster-node-3:6379 \
+          --cluster-replicas 0 \
+          -a ${REDIS_PASSWORD:-redispassword}; then
+          exit 0
+        fi
+
+        sleep 1
+        if cluster_ok; then
+          exit 0
+        fi
+
+        echo "redis cluster initialization failed"
+        exit 1
+    depends_on:
+      redis-cluster-node-1:
+        condition: service_started
+      redis-cluster-node-2:
+        condition: service_started
+      redis-cluster-node-3:
+        condition: service_started
+
+  redis-cluster-proxy:
+    image: kornrunner/redis-cluster-proxy:latest
+    platform: linux/amd64
+    logging: *default-logging
+    command:
+      - --port
+      - "7777"
+      - --auth
+      - ${REDIS_PASSWORD:-redispassword}
+      - redis-cluster-node-1:6379,redis-cluster-node-2:6379,redis-cluster-node-3:6379
+    ports:
+      - "${REDIS_CLUSTER_PROXY_HOST_PORT:-7777}:7777"
+    depends_on:
+      redis-cluster-init:
+        condition: service_completed_successfully
+
   grafana:
     image: grafana/grafana:11.4.0
+    logging: *default-logging
     ports:
-      - "3000:3000"
+      - "${GRAFANA_HOST_PORT:-3000}:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -158,13 +399,13 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.1.0
+    logging: *default-logging
     ports:
-      - "9090:9090"
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=15d"
-      - "--web.enable-lifecycle"
+      - "${PROMETHEUS_HOST_PORT:-9090}:9090"
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+      - "sed 's|__APP_PORT__|${APP_PORT:-8080}|g' /etc/prometheus/prometheus.yml > /tmp/prometheus.yml && exec /bin/prometheus --config.file=/tmp/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --web.enable-lifecycle --web.enable-remote-write-receiver"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules:/etc/prometheus/rules:ro
@@ -177,8 +418,9 @@ services:
 
   loki:
     image: grafana/loki:3.4.1
+    logging: *default-logging
     ports:
-      - "3100:3100"
+      - "${LOKI_HOST_PORT:-3100}:3100"
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
       - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
@@ -191,13 +433,15 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.116.1
+    logging: *default-logging
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8889:8889"
+      - "${OTEL_GRPC_HOST_PORT:-4317}:4317"
+      - "${OTEL_HTTP_HOST_PORT:-4318}:4318"
+      - "${OTEL_PROMETHEUS_HOST_PORT:-8889}:8889"
     command: ["--config=/etc/otel/otel-collector-config.yaml"]
     volumes:
       - ./otel/otel-collector-config.yaml:/etc/otel/otel-collector-config.yaml:ro
+      - nginx-logs:/var/log/nginx:ro
     depends_on:
       - loki
     deploy:
@@ -209,6 +453,7 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.8.2
     pid: host
+    logging: *default-logging
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -224,14 +469,46 @@ services:
           cpus: 0.5
           memory: 256M
 
-  mysqld-exporter:
+  mysqld-exporter-source:
     image: prom/mysqld-exporter:v0.16.0
+    logging: *default-logging
     environment:
-      - DATA_SOURCE_NAME=root:${MYSQL_ROOT_PASSWORD:-rootpassword}@(mysql:3306)/
+      - MYSQLD_EXPORTER_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+    command:
+      - "--mysqld.address=mysql-source:3306"
+      - "--mysqld.username=root"
+      - "--collect.perf_schema.eventsstatements"
+      - "--collect.perf_schema.tablelocks"
+      - "--collect.perf_schema.tableiowaits"
+      - "--collect.perf_schema.eventswaits"
     ports:
-      - "9104:9104"
+      - "${MYSQLD_EXPORTER_SOURCE_HOST_PORT:-9104}:9104"
     depends_on:
-      mysql:
+      mysql-source:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 256M
+
+  mysqld-exporter-replica:
+    image: prom/mysqld-exporter:v0.16.0
+    logging: *default-logging
+    environment:
+      - MYSQLD_EXPORTER_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+    command:
+      - "--mysqld.address=mysql-replica:3306"
+      - "--mysqld.username=root"
+      - "--collect.perf_schema.eventsstatements"
+      - "--collect.perf_schema.tablelocks"
+      - "--collect.perf_schema.tableiowaits"
+      - "--collect.perf_schema.eventswaits"
+      - "--collect.slave_status"
+    ports:
+      - "${MYSQLD_EXPORTER_REPLICA_HOST_PORT:-9105}:9104"
+    depends_on:
+      mysql-replica:
         condition: service_healthy
     deploy:
       resources:
@@ -241,11 +518,12 @@ services:
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.66.0
+    logging: *default-logging
     environment:
       - REDIS_ADDR=redis://redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
     ports:
-      - "9121:9121"
+      - "${REDIS_EXPORTER_HOST_PORT:-9121}:9121"
     depends_on:
       - redis
     deploy:
@@ -254,9 +532,30 @@ services:
           cpus: 0.5
           memory: 256M
 
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4.2
+    logging: *default-logging
+    command:
+      - "--nginx.scrape-uri=http://nginx:8080/stub_status"
+    ports:
+      - "${NGINX_EXPORTER_HOST_PORT:-9113}:9113"
+    depends_on:
+      - nginx
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 128M
+
 volumes:
-  mysql-data:
+  kafka-data:
+  mysql-source-data:
+  mysql-replica-data:
   redis-data:
+  redis-cluster-node-1-data:
+  redis-cluster-node-2-data:
+  redis-cluster-node-3-data:
   grafana-data:
+  nginx-logs:
   prometheus-data:
   loki-data:

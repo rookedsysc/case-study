@@ -6,6 +6,13 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  filelog/nginx:
+    include:
+      - /var/log/nginx/access.log
+      - /var/log/nginx/error.log
+    start_at: end
+    include_file_path: true
+
   prometheus:
     config:
       scrape_configs:
@@ -29,6 +36,15 @@ processors:
       - key: service.environment
         value: "production"
         action: insert
+
+  resource/nginx:
+    attributes:
+      - key: service.name
+        value: "nginx"
+        action: upsert
+      - key: service.namespace
+        value: "edge"
+        action: upsert
 
 exporters:
   prometheus:
@@ -54,6 +70,11 @@ service:
     logs:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
+      exporters: [otlphttp/loki]
+
+    logs/nginx:
+      receivers: [filelog/nginx]
+      processors: [memory_limiter, batch, resource, resource/nginx]
       exporters: [otlphttp/loki]
 
   telemetry:

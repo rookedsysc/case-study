@@ -175,8 +175,127 @@
           }
         }
       }
+    },
+    {
+      "id": 9,
+      "title": "프로세스 CPU 사용률",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "process_cpu_usage * 100",
+          "legendFormat": "CPU % - {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 85 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "HikariCP Pool 사용률",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "expr": "(hikaricp_connections_active / hikaricp_connections_max) * 100",
+          "legendFormat": "Pool Usage % - {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "coupon.issue.total 지연 시간 (p95/p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(coupon_issue_total_seconds_bucket[5m])) by (le))",
+          "legendFormat": "coupon.issue.total p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(coupon_issue_total_seconds_bucket[5m])) by (le))",
+          "legendFormat": "coupon.issue.total p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "coupon.issue.stage 단계별 지연 시간 (p95/p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(coupon_issue_stage_seconds_bucket[5m])) by (le, stage))",
+          "legendFormat": "coupon.issue.stage {{stage}} p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(coupon_issue_stage_seconds_bucket[5m])) by (le, stage))",
+          "legendFormat": "coupon.issue.stage {{stage}} p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "coupon.issue.failures 사유별 빈도",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "expr": "sum(rate(coupon_issue_failures_total[5m])) by (reason)",
+          "legendFormat": "coupon.issue.failures {{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
     }
   ],
   "schemaVersion": 38,
-  "version": 1
+  "version": 3
 }

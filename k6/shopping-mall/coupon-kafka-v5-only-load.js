@@ -22,10 +22,15 @@ const basePlan = createCouponKafkaLoadTest({
   verifyStatistics: true,
 });
 
-const issueCouponTags = { phase: "measure", kind: "issue_coupon_kafka_v5" };
+const issueCouponTags = {
+  phase: "measure",
+  kind: "issue_coupon_kafka_v5",
+  name: "POST /api/v5/coupons/kafka",
+};
 const eligibilityTags = {
   phase: "measure",
   kind: "check_eligibility_kafka_v5",
+  name: "GET /api/v5/coupons/kafka/eligibility",
 };
 
 function is4xxStatus(status) {

@@ -9,6 +9,8 @@ const ISSUE_COUPON_SUCCESS_DURATION = new Trend(
   "issue_coupon_success_duration",
   true,
 );
+const ELIGIBILITY_STOCK_AVAILABLE = new Rate("eligibility_stock_available");
+const ELIGIBILITY_STOCK_UNAVAILABLE = new Rate("eligibility_stock_unavailable");
 
 const BASE_URL = __ENV.BASE_URL || "http://localhost:38080";
 const REQUEST_TIMEOUT = __ENV.REQUEST_TIMEOUT || "10m";
@@ -60,11 +62,15 @@ export default function (data) {
   );
 
   const eligibility = parseJson(eligibilityResponse);
-  if (
-    eligibilityResponse.status !== 200 ||
-    eligibility === null ||
-    !eligibility.eligible
-  ) {
+  const isStockAvailable =
+    eligibilityResponse.status === 200 &&
+    eligibility !== null &&
+    eligibility.eligible;
+
+  ELIGIBILITY_STOCK_AVAILABLE.add(isStockAvailable, eligibilityTags);
+  ELIGIBILITY_STOCK_UNAVAILABLE.add(!isStockAvailable, eligibilityTags);
+
+  if (!isStockAvailable) {
     return;
   }
 

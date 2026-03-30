@@ -49,17 +49,21 @@ class CouponKafkaV4StageService(
         userId: UUID,
         couponId: UUID,
         issuedAt: Instant,
-        onPublishFailure: (Throwable) -> Unit,
     ) {
         couponIssueKafkaProducer.publishCouponIssue(
-            event =
-                CouponIssueEvent(
-                    couponId = couponId,
-                    storeId = storeId,
-                    userId = userId,
-                    issuedAt = issuedAt,
-                ),
-            onPublishFailure = onPublishFailure,
+            CouponIssueEvent(
+                couponId = couponId,
+                storeId = storeId,
+                userId = userId,
+                issuedAt = issuedAt,
+            ),
         )
+    }
+
+    fun unmarkCouponIssued(
+        storeId: UUID,
+        userId: UUID,
+    ) {
+        couponIssueCacheAsideStore.unmarkCouponIssued(storeId, userId)
     }
 }

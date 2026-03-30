@@ -199,6 +199,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_HEAP_OPTS: "-Xmx1g -Xms512m"
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
@@ -210,8 +211,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: 1
-          memory: 1G
+          cpus: 2
+          memory: 2G
 
   redis:
     image: redis:8.6-alpine

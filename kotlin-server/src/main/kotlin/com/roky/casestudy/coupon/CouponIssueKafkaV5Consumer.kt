@@ -29,7 +29,15 @@ class CouponIssueKafkaV5Consumer(
         groupId = "coupon-issue-v5-consumer",
     )
     fun consume(events: List<CouponIssueEvent>) {
-        events.forEach(::processEvent)
+        events.forEach { event ->
+            try {
+                processEvent(event)
+            } catch (e: CouponLimitExceededException) {
+                log.warn("재고 소진으로 발급 건너뜀: storeId={}, userId={}", event.storeId, event.userId)
+            } catch (e: DuplicateCouponException) {
+                log.warn("중복 발급 요청 건너뜀: storeId={}, userId={}", event.storeId, event.userId)
+            }
+        }
     }
 
     private fun processEvent(event: CouponIssueEvent) {
@@ -57,6 +65,7 @@ class CouponIssueKafkaV5Consumer(
                 userId = event.userId,
             )
         if (!isReserved) {
+            couponRedisCoordinator.rollbackStock(event.storeId)
             throw DuplicateCouponException(event.storeId, event.userId)
         }
 

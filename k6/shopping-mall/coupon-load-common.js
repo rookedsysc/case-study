@@ -30,7 +30,7 @@ function is4xxStatus(status) {
 }
 
 function isIssueCouponSuccessStatus(status) {
-  return status === 201 || is4xxStatus(status);
+  return status === 201 || status === 202 || is4xxStatus(status);
 }
 
 function parseJson(response) {
@@ -224,8 +224,8 @@ export function createCouponLoadTest({
   configOverrides = {},
 }) {
   const expectedIssueStatuses = verifyStatistics
-    ? http.expectedStatuses(201, { min: 400, max: 499 })
-    : http.expectedStatuses(201);
+    ? http.expectedStatuses(201, 202, { min: 400, max: 499 })
+    : http.expectedStatuses(201, 202);
 
   const config = {
     ...BASE_CONFIG,
@@ -299,18 +299,20 @@ export function createCouponLoadTest({
         );
       }
 
+      const isSuccessResponse = response.status === 201 || response.status === 202;
+
       check(response, {
         "쿠폰 발행 응답 허용": (result) =>
           isIssueCouponSuccessStatus(result.status),
         "쿠폰 발행 성공 시 ID 존재": () =>
-          response.status !== 201 || (body !== null && body.id !== undefined),
+          !isSuccessResponse || (body !== null && body.id !== undefined),
         "쿠폰 발행 성공 시 storeId 일치": () =>
-          response.status !== 201 ||
+          !isSuccessResponse ||
           (body !== null && body.storeId === data.storeId),
         "쿠폰 발행 성공 시 userId 일치": () =>
-          response.status !== 201 || (body !== null && body.userId === userId),
+          !isSuccessResponse || (body !== null && body.userId === userId),
         "쿠폰 발행 성공 시 issuedAt 존재": () =>
-          response.status !== 201 ||
+          !isSuccessResponse ||
           (body !== null && body.issuedAt !== undefined),
       });
     },

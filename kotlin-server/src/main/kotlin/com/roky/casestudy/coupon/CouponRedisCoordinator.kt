@@ -5,6 +5,7 @@ import com.roky.casestudy.coupon.exception.CouponIssueInProgressException
 import org.redisson.api.RScript
 import org.redisson.api.RedissonClient
 import org.springframework.core.io.ClassPathResource
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.UUID
@@ -13,6 +14,7 @@ import java.util.concurrent.TimeUnit
 @Component
 class CouponRedisCoordinator(
     private val redissonClient: RedissonClient,
+    private val stringRedisTemplate: StringRedisTemplate,
     private val couponSoldOutLocalCache: CouponSoldOutLocalCache,
 ) {
     private val decreaseStockScript: String =
@@ -147,7 +149,23 @@ class CouponRedisCoordinator(
         )
     }
 
+    /** dedup 키가 존재하는지 읽기 전용으로 확인합니다. 발급 요청이 진행 중이면 true를 반환합니다. */
+    fun isDedupKeyPresent(
+        storeId: UUID,
+        userId: UUID,
+    ): Boolean =
+        stringRedisTemplate.hasKey(dedupKey(storeId, userId))
+
+    /** SETNX 기반 따닥 방지. TTL 내 동일 요청이면 false를 반환합니다. */
+    fun tryAcquireDedup(
+        storeId: UUID,
+        userId: UUID,
+    ): Boolean =
+        stringRedisTemplate.opsForValue()
+            .setIfAbsent(dedupKey(storeId, userId), "1", DEDUP_TTL) == true
+
     companion object {
+        private val DEDUP_TTL: Duration = Duration.ofSeconds(2)
         private const val STOCK_KEY_MISSING_RESULT = -1L
         private const val STOCK_DECREASED_RESULT = 1L
     }
@@ -165,4 +183,8 @@ class CouponRedisCoordinator(
 
     private fun stockKey(storeId: UUID): String = "coupon:stock:remaining:$storeId"
 
+    private fun dedupKey(
+        storeId: UUID,
+        userId: UUID,
+    ): String = "coupon:v5:dedup:$storeId:$userId"
 }

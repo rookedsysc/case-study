@@ -1,6 +1,7 @@
 package com.roky.casestudy.config
 
 import com.roky.casestudy.coupon.CouponIssueKafkaProducer
+import com.roky.casestudy.coupon.CouponKafkaV5Service
 import com.roky.casestudy.coupon.dto.CouponIssueEvent
 import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -38,6 +39,14 @@ class KafkaConfig(
     fun couponIssueTopic(): NewTopic =
         TopicBuilder
             .name(CouponIssueKafkaProducer.TOPIC)
+            .partitions(couponIssueTopicPartitions.coerceAtLeast(1))
+            .replicas(couponIssueTopicReplicationFactor.coerceAtLeast(1))
+            .build()
+
+    @Bean
+    fun couponIssueRequestTopic(): NewTopic =
+        TopicBuilder
+            .name(CouponKafkaV5Service.TOPIC)
             .partitions(couponIssueTopicPartitions.coerceAtLeast(1))
             .replicas(couponIssueTopicReplicationFactor.coerceAtLeast(1))
             .build()

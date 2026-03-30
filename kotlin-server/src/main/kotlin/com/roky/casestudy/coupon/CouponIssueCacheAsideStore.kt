@@ -40,6 +40,13 @@ class CouponIssueCacheAsideStore(
                 },
             )
 
+    /** 발급 유저 Set에 해당 유저가 존재하는지 읽기 전용으로 확인합니다. */
+    fun isCouponIssued(
+        storeId: UUID,
+        userId: UUID,
+    ): Boolean =
+        redisTemplate.opsForSet().isMember(couponIssuedUsersKey(storeId), userId.toString()) == true
+
     /** 발급 유저 Set에 예약 마킹을 시도합니다. 이미 발급된 경우 false를 반환합니다. */
     fun reserveCouponIssue(
         storeId: UUID,
